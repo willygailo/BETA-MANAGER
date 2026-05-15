@@ -1,6 +1,5 @@
 package beta.manager.ui.viewmodel
 
-import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import beta.manager.plugin.PluginInfo
@@ -19,8 +18,12 @@ data class PluginUiState(
     val installResult: String? = null,
     val actionOutput: String? = null,
     val isFixing: Boolean = false,
-    val fixResult: String? = null
+    val fixResult: String? = null,
+    val selectedPlugin: PluginInfo? = null,
+    val flashMode: FlashMode = FlashMode.BETA
 )
+
+enum class FlashMode { BETA, MAGISK, KSU }
 
 class PluginViewModel : ViewModel() {
 
@@ -54,6 +57,14 @@ class PluginViewModel : ViewModel() {
                 )
             }
         }
+    }
+
+    fun selectPlugin(plugin: PluginInfo?) {
+        _uiState.value = _uiState.value.copy(selectedPlugin = plugin)
+    }
+
+    fun setFlashMode(mode: FlashMode) {
+        _uiState.value = _uiState.value.copy(flashMode = mode)
     }
 
     fun togglePlugin(id: String) {
@@ -92,10 +103,15 @@ class PluginViewModel : ViewModel() {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isInstalling = true, installResult = null)
             try {
-                val result = pluginInstaller.install(zipPath)
+                val mode = _uiState.value.flashMode
+                val result = when (mode) {
+                    FlashMode.BETA -> pluginInstaller.install(zipPath)
+                    FlashMode.MAGISK -> pluginInstaller.installToMagisk(zipPath).success
+                    FlashMode.KSU -> pluginInstaller.installToKSU(zipPath).success
+                }
                 _uiState.value = _uiState.value.copy(
                     isInstalling = false,
-                    installResult = if (result) "Plugin installed successfully" else "Installation failed"
+                    installResult = if (result) "Module installed successfully" else "Installation failed"
                 )
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
@@ -123,25 +139,6 @@ class PluginViewModel : ViewModel() {
                 _uiState.value = _uiState.value.copy(
                     isFixing = false,
                     fixResult = "Fix failed: ${e.message}"
-                )
-            }
-            loadPlugins()
-        }
-    }
-
-    fun flashToMagisk(zipPath: String) {
-        viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isInstalling = true, installResult = null)
-            try {
-                val result = pluginInstaller.installToMagisk(zipPath)
-                _uiState.value = _uiState.value.copy(
-                    isInstalling = false,
-                    installResult = result.message
-                )
-            } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    isInstalling = false,
-                    installResult = "Error: ${e.message}"
                 )
             }
             loadPlugins()

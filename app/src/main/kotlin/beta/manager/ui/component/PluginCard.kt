@@ -1,6 +1,7 @@
 package beta.manager.ui.component
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -14,9 +15,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.sp
 import beta.manager.plugin.PluginInfo
+import beta.manager.plugin.PluginSource
 import beta.manager.ui.theme.*
 
 @Composable
@@ -29,28 +33,42 @@ fun PluginCard(
     showActionOutput: String? = null
 ) {
     var showRemoveDialog by remember { mutableStateOf(false) }
+    var showDetail by remember { mutableStateOf(false) }
+
+    val sourceColor = when (plugin.source) {
+        PluginSource.BETA -> NeonCyan
+        PluginSource.AXMANAGER -> NeonOrange
+        PluginSource.MAGISK -> NeonGreen
+        PluginSource.KSU -> NeonPurple
+    }
+    val sourceLabel = when (plugin.source) {
+        PluginSource.BETA -> "BETA"
+        PluginSource.AXMANAGER -> "AXRON"
+        PluginSource.MAGISK -> "MAGISK"
+        PluginSource.KSU -> "KSU"
+    }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(
             containerColor = if (plugin.isEnabled) DarkCard else DarkSurfaceVariant
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = if (plugin.isEnabled) 2.dp else 0.dp)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(14.dp)) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().clickable { showDetail = true },
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(14.dp)
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Box(
                     modifier = Modifier
                         .size(44.dp)
-                        .clip(RoundedCornerShape(12.dp))
+                        .clip(RoundedCornerShape(10.dp))
                         .background(
                             if (plugin.isEnabled)
-                                Brush.linearGradient(listOf(NeonCyan, NeonPurple))
+                                Brush.linearGradient(listOf(sourceColor, sourceColor.copy(alpha = 0.4f)))
                             else
                                 Brush.linearGradient(listOf(DarkSurfaceVariant, DarkSurfaceVariant))
                         ),
@@ -63,27 +81,42 @@ fun PluginCard(
                         modifier = Modifier.size(22.dp)
                     )
                 }
-
                 Column(modifier = Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(
+                            plugin.name,
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = if (plugin.isEnabled) TextPrimary else TextTertiary,
+                            maxLines = 1
+                        )
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(sourceColor.copy(alpha = 0.2f))
+                                .padding(horizontal = 5.dp, vertical = 1.dp)
+                        ) {
+                            Text(
+                                sourceLabel,
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = sourceColor
+                            )
+                        }
+                    }
                     Text(
-                        plugin.name,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = if (plugin.isEnabled) TextPrimary else TextTertiary
-                    )
-                    Text(
-                        "${plugin.version} by ${plugin.author}",
+                        "${plugin.version} · ${plugin.author.ifEmpty { "Unknown" }}",
                         style = MaterialTheme.typography.bodySmall,
-                        color = TextTertiary
+                        color = TextTertiary,
+                        fontSize = 11.sp
                     )
                 }
-
                 Switch(
                     checked = plugin.isEnabled,
                     onCheckedChange = { onToggle() },
                     colors = SwitchDefaults.colors(
                         checkedThumbColor = Color.White,
-                        checkedTrackColor = NeonCyan,
+                        checkedTrackColor = sourceColor,
                         uncheckedThumbColor = TextTertiary,
                         uncheckedTrackColor = DarkSurfaceVariant
                     )
@@ -91,65 +124,57 @@ fun PluginCard(
             }
 
             if (plugin.description.isNotBlank()) {
-                Spacer(Modifier.height(10.dp))
+                Spacer(Modifier.height(6.dp))
                 Text(
                     plugin.description,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = TextSecondary
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextSecondary,
+                    maxLines = 2,
+                    fontSize = 12.sp
                 )
             }
 
-            Spacer(Modifier.height(14.dp))
-
+            Spacer(Modifier.height(12.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (plugin.hasAction) {
                     FilledTonalButton(
                         onClick = onRunAction,
                         shape = RoundedCornerShape(10.dp),
-                        colors = ButtonDefaults.filledTonalButtonColors(
-                            containerColor = NeonPurple.copy(alpha = 0.15f)
-                        )
+                        colors = ButtonDefaults.filledTonalButtonColors(containerColor = NeonPurple.copy(alpha = 0.15f))
                     ) {
-                        Icon(
-                            imageVector = Icons.Filled.PlayArrow,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp)
-                        )
+                        Icon(Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(Modifier.width(6.dp))
-                        Text("Run", color = NeonPurple)
+                        Text("Action", color = NeonPurple, fontSize = 12.sp)
                     }
                 }
                 if (plugin.hasWebUI && onOpenWebUI != null) {
                     FilledTonalButton(
                         onClick = onOpenWebUI,
                         shape = RoundedCornerShape(10.dp),
-                        colors = ButtonDefaults.filledTonalButtonColors(
-                            containerColor = NeonCyan.copy(alpha = 0.15f)
-                        )
+                        colors = ButtonDefaults.filledTonalButtonColors(containerColor = NeonCyan.copy(alpha = 0.15f))
                     ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.OpenInNew,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp)
-                        )
+                        Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(Modifier.width(6.dp))
-                        Text("WebUI", color = NeonCyan)
+                        Text("WebUI", color = NeonCyan, fontSize = 12.sp)
                     }
+                }
+                FilledTonalButton(
+                    onClick = { showDetail = true },
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.filledTonalButtonColors(containerColor = NeonCyan.copy(alpha = 0.1f))
+                ) {
+                    Icon(Icons.Filled.Info, contentDescription = null, modifier = Modifier.size(16.dp), tint = NeonCyan)
+                    Spacer(Modifier.width(6.dp))
+                    Text("Info", color = NeonCyan, fontSize = 12.sp)
                 }
                 OutlinedButton(
                     onClick = { showRemoveDialog = true },
                     shape = RoundedCornerShape(10.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        contentColor = NeonRed
-                    )
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = NeonRed)
                 ) {
-                    Icon(
-                        imageVector = Icons.Filled.Delete,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp)
-                    )
+                    Icon(Icons.Filled.Delete, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(6.dp))
-                    Text("Remove")
+                    Text("Remove", fontSize = 12.sp)
                 }
             }
 
@@ -165,8 +190,7 @@ fun PluginCard(
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Icon(
-                            imageVector = Icons.Filled.Info,
-                            contentDescription = null,
+                            Icons.Filled.Info, contentDescription = null,
                             tint = if (showActionOutput.startsWith("Error") || showActionOutput.startsWith("Failed")) NeonRed else NeonGreen,
                             modifier = Modifier.size(16.dp)
                         )
@@ -184,50 +208,62 @@ fun PluginCard(
     if (showRemoveDialog) {
         AlertDialog(
             onDismissRequest = { showRemoveDialog = false },
-            icon = {
-                Icon(
-                    imageVector = Icons.Filled.Warning,
-                    contentDescription = null,
-                    tint = NeonRed,
-                    modifier = Modifier.size(28.dp)
-                )
-            },
-            title = {
-                Text(
-                    "Remove Plugin",
-                    fontWeight = FontWeight.Bold,
-                    color = TextPrimary
-                )
-            },
-            text = {
-                Text(
-                    "Remove \"${plugin.name}\"? It will be deleted on next reboot.",
-                    color = TextSecondary
-                )
-            },
+            icon = { Icon(Icons.Filled.Warning, contentDescription = null, tint = NeonRed, modifier = Modifier.size(28.dp)) },
+            title = { Text("Remove Module", fontWeight = FontWeight.Bold, color = TextPrimary) },
+            text = { Text("Remove \"${plugin.name}\"? It will be deleted on next reboot.", color = TextSecondary) },
             confirmButton = {
                 Button(
-                    onClick = {
-                        onRemove()
-                        showRemoveDialog = false
-                    },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = NeonRed.copy(alpha = 0.2f),
-                        contentColor = NeonRed
-                    ),
+                    onClick = { onRemove(); showRemoveDialog = false },
+                    colors = ButtonDefaults.buttonColors(containerColor = NeonRed.copy(alpha = 0.2f), contentColor = NeonRed),
                     shape = RoundedCornerShape(10.dp)
                 ) { Text("Remove") }
             },
             dismissButton = {
-                OutlinedButton(
-                    onClick = { showRemoveDialog = false },
-                    shape = RoundedCornerShape(10.dp)
-                ) { Text("Cancel") }
+                OutlinedButton(onClick = { showRemoveDialog = false }, shape = RoundedCornerShape(10.dp)) { Text("Cancel") }
             },
-            containerColor = DarkSurface,
-            titleContentColor = TextPrimary,
-            textContentColor = TextSecondary,
+            containerColor = DarkSurface, titleContentColor = TextPrimary, textContentColor = TextSecondary,
             shape = RoundedCornerShape(20.dp)
         )
+    }
+
+    if (showDetail) {
+        AlertDialog(
+            onDismissRequest = { showDetail = false },
+            icon = { Icon(Icons.Filled.Extension, contentDescription = null, tint = sourceColor, modifier = Modifier.size(32.dp)) },
+            title = { Text(plugin.name, fontWeight = FontWeight.Bold, color = TextPrimary) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    DetailRow("ID", plugin.id)
+                    DetailRow("Version", "${plugin.version} (code ${plugin.versionCode})")
+                    DetailRow("Author", plugin.author.ifEmpty { "Unknown" })
+                    DetailRow("Source", sourceLabel)
+                    DetailRow("Status", if (plugin.isEnabled) "Enabled" else "Disabled")
+                    DetailRow("Action Script", if (plugin.hasAction) "Yes" else "No")
+                    DetailRow("WebUI", if (plugin.hasWebUI) "Available" else "N/A")
+                    if (plugin.description.isNotBlank()) {
+                        Spacer(Modifier.height(4.dp))
+                        Text("Description", style = MaterialTheme.typography.labelSmall, color = TextTertiary)
+                        Text(plugin.description, style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = { showDetail = false },
+                    colors = ButtonDefaults.buttonColors(containerColor = sourceColor, contentColor = DarkBackground),
+                    shape = RoundedCornerShape(10.dp)
+                ) { Text("OK") }
+            },
+            containerColor = DarkSurface, titleContentColor = TextPrimary, textContentColor = TextSecondary,
+            shape = RoundedCornerShape(20.dp)
+        )
+    }
+}
+
+@Composable
+private fun DetailRow(label: String, value: String) {
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        Text(label, style = MaterialTheme.typography.labelSmall, color = TextTertiary)
+        Text(value, style = MaterialTheme.typography.bodySmall, color = TextPrimary, fontWeight = FontWeight.SemiBold)
     }
 }

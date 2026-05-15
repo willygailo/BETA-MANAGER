@@ -34,7 +34,11 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun setAutoStart(enabled: Boolean) {
-        viewModelScope.launch { prefs.setAutoStart(enabled) }
+        viewModelScope.launch {
+            prefs.setAutoStart(enabled)
+            val bootPrefs = getApplication<android.app.Application>().getSharedPreferences("beta_boot_prefs", android.content.Context.MODE_PRIVATE)
+            bootPrefs.edit().putBoolean("auto_start", enabled).apply()
+        }
     }
 
     fun setNotifications(enabled: Boolean) {

@@ -154,7 +154,9 @@ fun BetaManagerNav() {
                 HomeScreen(
                     viewModel = homeViewModel,
                     onNavigateToShell = { navController.navigate(NavRoutes.ShellExecutor.route) },
-                    onInstallPlugin = { filePickerLauncher.launch("application/zip") }
+                    onInstallPlugin = { filePickerLauncher.launch("application/zip") },
+                    onNavigateToLogs = { navController.navigate(NavRoutes.Logs.route) },
+                    onNavigateToSuperuser = { navController.navigate(NavRoutes.Superuser.route) }
                 )
             }
 
@@ -185,6 +187,18 @@ fun BetaManagerNav() {
 
             composable(NavRoutes.ShellExecutor.route) {
                 ShellExecutorScreen(
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            }
+
+            composable(NavRoutes.Logs.route) {
+                LogScreen(
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            }
+
+            composable(NavRoutes.Superuser.route) {
+                SuperuserScreen(
                     onNavigateBack = { navController.popBackStack() }
                 )
             }

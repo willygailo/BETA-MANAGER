@@ -34,7 +34,9 @@ import beta.manager.ui.viewmodel.HomeViewModel
 fun HomeScreen(
     viewModel: HomeViewModel,
     onNavigateToShell: () -> Unit,
-    onInstallPlugin: (() -> Unit)? = null
+    onInstallPlugin: (() -> Unit)? = null,
+    onNavigateToLogs: (() -> Unit)? = null,
+    onNavigateToSuperuser: (() -> Unit)? = null
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
@@ -79,7 +81,7 @@ fun HomeScreen(
                 item { AutoActivateCard(uiState, viewModel::autoActivate) }
             }
 
-            item { QuickActionsRow(uiState, viewModel, onNavigateToShell, onInstallPlugin) }
+            item { QuickActionsRow(uiState, viewModel, onNavigateToShell, onInstallPlugin, onNavigateToLogs, onNavigateToSuperuser) }
 
             item {
                 Row(
@@ -270,55 +272,71 @@ private fun QuickActionsRow(
     state: beta.manager.ui.viewmodel.HomeUiState,
     viewModel: HomeViewModel,
     onNavigateToShell: () -> Unit,
-    onInstallPlugin: (() -> Unit)?
+    onInstallPlugin: (() -> Unit)?,
+    onNavigateToLogs: (() -> Unit)?,
+    onNavigateToSuperuser: (() -> Unit)?
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(10.dp)
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        ActionChip(
+        MiniChip(
             icon = Icons.Filled.Add,
             label = "Install",
             color = NeonCyan,
             onClick = { onInstallPlugin?.invoke() },
             modifier = Modifier.weight(1f)
         )
-        ActionChip(
-            icon = Icons.Filled. CleaningServices,
+        MiniChip(
+            icon = Icons.Filled.CleaningServices,
             label = if (state.isCleaning) "..." else "Clean",
             color = NeonOrange,
             onClick = { viewModel.cleanAll() },
             modifier = Modifier.weight(1f)
         )
-        ActionChip(
+        MiniChip(
             icon = Icons.Filled.Terminal,
             label = "Shell",
             color = NeonGreen,
             onClick = onNavigateToShell,
             modifier = Modifier.weight(1f)
         )
-        ActionChip(
+        MiniChip(
             icon = if (state.isGameBoosted) Icons.Filled.Bolt else Icons.Filled.Speed,
-            label = if (state.isGameBoosted) "Boost ON" else "Boost",
+            label = if (state.isGameBoosted) "Boost" else "Boost",
             color = if (state.isGameBoosted) NeonGreen else NeonPink,
             onClick = { viewModel.toggleGameBoost() },
+            modifier = Modifier.weight(1f)
+        )
+        MiniChip(
+            icon = Icons.Filled.Description,
+            label = "Logs",
+            color = NeonPurple,
+            onClick = { onNavigateToLogs?.invoke() },
+            modifier = Modifier.weight(1f)
+        )
+        MiniChip(
+            icon = Icons.Filled.Shield,
+            label = "SU",
+            color = NeonYellow,
+            onClick = { onNavigateToSuperuser?.invoke() },
             modifier = Modifier.weight(1f)
         )
     }
 }
 
 @Composable
-private fun ActionChip(
+private fun MiniChip(
     icon: ImageVector,
     label: String,
     color: Color,
     onClick: () -> Unit,
-    modifier: Modifier
+    modifier: Modifier = Modifier
 ) {
     Card(
         onClick = onClick,
-        modifier = modifier.height(72.dp),
-        shape = RoundedCornerShape(14.dp),
+        modifier = modifier.height(64.dp),
+        shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = DarkCard),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
@@ -327,12 +345,14 @@ private fun ActionChip(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(22.dp))
-            Spacer(Modifier.height(4.dp))
-            Text(label, style = MaterialTheme.typography.labelSmall, color = TextSecondary, fontSize = 10.sp)
+            Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.height(3.dp))
+            Text(label, style = MaterialTheme.typography.labelSmall, color = TextSecondary, fontSize = 9.sp, textAlign = TextAlign.Center)
         }
     }
 }
+
+
 
 @Composable
 private fun ModuleCard(
