@@ -15,10 +15,16 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -77,11 +83,20 @@ fun ShellExecutorScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Shell", fontWeight = FontWeight.Bold) },
+                title = { Text("Terminal", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
-                    TextButton(onClick = onNavigateBack) { Text("Back") }
+                    IconButton(onClick = onNavigateBack) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back",
+                            tint = TextPrimary
+                        )
+                    }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = DarkBackground)
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = DarkBackground,
+                    titleContentColor = TextPrimary
+                )
             )
         }
     ) { padding ->
@@ -91,58 +106,99 @@ fun ShellExecutorScreen(
                 .padding(padding)
                 .padding(12.dp)
         ) {
-            LazyColumn(
+            Box(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
-                    .background(DarkSurface, RoundedCornerShape(8.dp))
-                    .padding(12.dp),
-                state = listState,
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(DarkSurface)
+                    .padding(12.dp)
             ) {
-                items(entries) { entry ->
-                    if (entry.command.isNotBlank()) {
-                        Text(
-                            entry.command,
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 13.sp,
-                            color = NeonCyan
-                        )
-                    }
-                    if (entry.output.isNotBlank()) {
-                        Text(
-                            entry.output,
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 12.sp,
-                            color = if (entry.isError) NeonRed else TextPrimary,
-                            modifier = Modifier.horizontalScroll(rememberScrollState())
-                        )
+                LazyColumn(
+                    state = listState,
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    items(entries) { entry ->
+                        if (entry.command.isNotBlank()) {
+                            Text(
+                                entry.command,
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = NeonGreen
+                            )
+                        }
+                        if (entry.output.isNotBlank()) {
+                            Text(
+                                entry.output,
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 12.sp,
+                                color = if (entry.isError) NeonRed else TextPrimary,
+                                modifier = Modifier.horizontalScroll(rememberScrollState())
+                            )
+                        }
                     }
                 }
             }
 
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(10.dp))
 
-            OutlinedTextField(
-                value = input,
-                onValueChange = { input = it },
+            Row(
                 modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("Type command...", color = TextTertiary) },
-                textStyle = androidx.compose.ui.text.TextStyle(
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = 14.sp,
-                    color = TextPrimary
-                ),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = NeonCyan,
-                    unfocusedBorderColor = TextTertiary,
-                    cursorColor = NeonCyan
-                ),
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                keyboardActions = KeyboardActions(onSend = { execute(input.trim()) }),
-                singleLine = true,
-                shape = RoundedCornerShape(8.dp)
-            )
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Terminal,
+                    contentDescription = null,
+                    tint = NeonGreen,
+                    modifier = Modifier.size(20.dp)
+                )
+
+                OutlinedTextField(
+                    value = input,
+                    onValueChange = { input = it },
+                    modifier = Modifier.weight(1f),
+                    placeholder = {
+                        Text(
+                            "Type command...",
+                            color = TextTertiary,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    },
+                    textStyle = MaterialTheme.typography.bodyMedium.copy(
+                        fontFamily = FontFamily.Monospace,
+                        color = TextPrimary
+                    ),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = NeonGreen,
+                        unfocusedBorderColor = CardBorder,
+                        cursorColor = NeonGreen,
+                        focusedContainerColor = DarkSurface,
+                        unfocusedContainerColor = DarkSurface
+                    ),
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                    keyboardActions = KeyboardActions(onSend = { execute(input.trim()) }),
+                    singleLine = true,
+                    shape = RoundedCornerShape(12.dp)
+                )
+
+                IconButton(
+                    onClick = { execute(input.trim()) },
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(
+                            Brush.linearGradient(listOf(NeonGreen.copy(alpha = 0.2f), NeonGreen.copy(alpha = 0.05f)))
+                        )
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.Send,
+                        contentDescription = "Execute",
+                        tint = NeonGreen
+                    )
+                }
+            }
         }
     }
 }

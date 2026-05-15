@@ -2,7 +2,6 @@ package beta.manager.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// Gaming-inspired color palette — dark cyberpunk / neon
 val NeonCyan = Color(0xFF00E5FF)
 val NeonPink = Color(0xFFFF0080)
 val NeonPurple = Color(0xFF7C4DFF)
@@ -11,13 +10,21 @@ val NeonOrange = Color(0xFFFF6D00)
 val NeonRed = Color(0xFFFF1744)
 val NeonYellow = Color(0xFFEAFF00)
 
-// Surface / background
-val DarkBackground = Color(0xFF0D0D14)
-val DarkSurface = Color(0xFF1A1A26)
-val DarkSurfaceVariant = Color(0xFF252536)
-val DarkCard = Color(0xFF1E1E30)
+val DarkBackground = Color(0xFF0A0A14)
+val DarkSurface = Color(0xFF12121F)
+val DarkSurfaceVariant = Color(0xFF1C1C30)
+val DarkCard = Color(0xFF16162A)
 
-// Text
-val TextPrimary = Color(0xFFE8E8F0)
-val TextSecondary = Color(0xFF9E9EB8)
-val TextTertiary = Color(0xFF6E6E8A)
+val TextPrimary = Color(0xFFF0F0FF)
+val TextSecondary = Color(0xFFA0A0C0)
+val TextTertiary = Color(0xFF707090)
+
+val SurfaceGradientStart = Color(0xFF1A1A35)
+val SurfaceGradientEnd = Color(0xFF0E0E20)
+
+val CardBorder = Color(0xFF2A2A45)
+val DividerColor = Color(0xFF1E1E38)
+
+val SuccessLight = Color(0xFF4CAF50)
+val WarningLight = Color(0xFFFFC107)
+val InfoLight = Color(0xFF2196F3)

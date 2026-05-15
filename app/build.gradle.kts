@@ -12,8 +12,8 @@ android {
         applicationId = "beta.manager"
         minSdk = 26
         targetSdk = 36
-        versionCode = 10001
-        versionName = "1.0.0"
+        versionCode = 10002
+        versionName = "1.1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

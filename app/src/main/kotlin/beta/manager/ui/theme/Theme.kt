@@ -6,6 +6,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
@@ -13,19 +14,33 @@ import androidx.core.view.WindowCompat
 private val BetaColorScheme = darkColorScheme(
     primary = NeonCyan,
     onPrimary = DarkBackground,
+    primaryContainer = NeonCyan.copy(alpha = 0.15f),
+    onPrimaryContainer = NeonCyan,
     secondary = NeonPurple,
-    onSecondary = TextPrimary,
+    onSecondary = DarkBackground,
+    secondaryContainer = NeonPurple.copy(alpha = 0.15f),
+    onSecondaryContainer = NeonPurple,
     tertiary = NeonPink,
-    onTertiary = TextPrimary,
+    onTertiary = DarkBackground,
+    tertiaryContainer = NeonPink.copy(alpha = 0.15f),
+    onTertiaryContainer = NeonPink,
     background = DarkBackground,
     onBackground = TextPrimary,
     surface = DarkSurface,
     onSurface = TextPrimary,
     surfaceVariant = DarkSurfaceVariant,
     onSurfaceVariant = TextSecondary,
+    surfaceTint = DarkSurface,
     error = NeonRed,
-    onError = TextPrimary,
-    outline = TextTertiary
+    onError = DarkBackground,
+    errorContainer = NeonRed.copy(alpha = 0.15f),
+    onErrorContainer = NeonRed,
+    outline = CardBorder,
+    outlineVariant = DividerColor,
+    inverseSurface = TextPrimary,
+    inverseOnSurface = DarkBackground,
+    inversePrimary = NeonCyan.copy(alpha = 0.8f),
+    scrim = Color(0xFF000000).copy(alpha = 0.5f)
 )
 
 @Composable

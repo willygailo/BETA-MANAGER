@@ -7,24 +7,48 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.animation.*
+import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Dashboard
+import androidx.compose.material.icons.filled.Extension
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.SportsEsports
+import androidx.compose.material.icons.outlined.Dashboard
+import androidx.compose.material.icons.outlined.Extension
+import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.SportsEsports
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavDestination.Companion.hierarchy
+import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import beta.manager.navigation.NavRoutes
 import beta.manager.ui.screen.*
-import beta.manager.ui.theme.BetaManagerTheme
+import beta.manager.ui.theme.*
 import beta.manager.ui.viewmodel.GameProfilesViewModel
 import beta.manager.ui.viewmodel.HomeViewModel
 import beta.manager.ui.viewmodel.PluginViewModel
 import beta.manager.ui.viewmodel.SettingsViewModel
 import java.io.File
 import java.io.FileOutputStream
+
+data class BottomNavItem(
+    val label: String,
+    val selectedIcon: ImageVector,
+    val unselectedIcon: ImageVector,
+    val route: String
+)
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -61,62 +85,119 @@ fun BetaManagerNav() {
         }
     }
 
-    NavHost(
-        navController = navController,
-        startDestination = NavRoutes.Home.route
-    ) {
-        composable(NavRoutes.Home.route) {
-            HomeScreen(
-                viewModel = homeViewModel,
-                onNavigateToPlugins = { navController.navigate(NavRoutes.Plugins.route) },
-                onNavigateToGameProfiles = { navController.navigate(NavRoutes.GameProfiles.route) },
-                onNavigateToSettings = { navController.navigate(NavRoutes.Settings.route) },
-                onNavigateToShell = { navController.navigate(NavRoutes.ShellExecutor.route) }
-            )
-        }
+    val bottomNavItems = listOf(
+        BottomNavItem("Home", Icons.Filled.Dashboard, Icons.Outlined.Dashboard, NavRoutes.Home.route),
+        BottomNavItem("Plugins", Icons.Filled.Extension, Icons.Outlined.Extension, NavRoutes.Plugins.route),
+        BottomNavItem("Profiles", Icons.Filled.SportsEsports, Icons.Outlined.SportsEsports, NavRoutes.GameProfiles.route),
+        BottomNavItem("Settings", Icons.Filled.Settings, Icons.Outlined.Settings, NavRoutes.Settings.route),
+    )
 
-        composable(NavRoutes.Plugins.route) {
-            PluginScreen(
-                viewModel = pluginViewModel,
-                onNavigateBack = { navController.popBackStack() },
-                onInstallPlugin = { filePickerLauncher.launch("application/zip") },
-                onOpenWebUI = { pluginId ->
-                    navController.navigate(NavRoutes.WebUI.createRoute(pluginId))
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentDestination = navBackStackEntry?.destination
+    val showBottomBar = currentDestination?.route in bottomNavItems.map { it.route }
+
+    Scaffold(
+        bottomBar = {
+            if (showBottomBar) {
+                NavigationBar(
+                    containerColor = DarkSurface,
+                    contentColor = TextPrimary,
+                    tonalElevation = 0.dp,
+                ) {
+                    bottomNavItems.forEach { item ->
+                        val selected = currentDestination?.hierarchy?.any { it.route == item.route } == true
+                        NavigationBarItem(
+                            selected = selected,
+                            onClick = {
+                                if (currentDestination?.route != item.route) {
+                                    navController.navigate(item.route) {
+                                        popUpTo(navController.graph.findStartDestination().id) {
+                                            saveState = true
+                                        }
+                                        launchSingleTop = true
+                                        restoreState = true
+                                    }
+                                }
+                            },
+                            icon = {
+                                Icon(
+                                    imageVector = if (selected) item.selectedIcon else item.unselectedIcon,
+                                    contentDescription = item.label
+                                )
+                            },
+                            label = {
+                                Text(
+                                    text = item.label,
+                                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                                    style = MaterialTheme.typography.labelSmall
+                                )
+                            },
+                            colors = NavigationBarItemDefaults.colors(
+                                selectedIconColor = NeonCyan,
+                                selectedTextColor = NeonCyan,
+                                unselectedIconColor = TextTertiary,
+                                unselectedTextColor = TextTertiary,
+                                indicatorColor = NeonCyan.copy(alpha = 0.12f)
+                            )
+                        )
+                    }
                 }
-            )
+            }
         }
+    ) { innerPadding ->
+        NavHost(
+            navController = navController,
+            startDestination = NavRoutes.Home.route,
+            modifier = Modifier.padding(innerPadding)
+        ) {
+            composable(NavRoutes.Home.route) {
+                HomeScreen(
+                    viewModel = homeViewModel,
+                    onNavigateToShell = { navController.navigate(NavRoutes.ShellExecutor.route) }
+                )
+            }
 
-        composable(NavRoutes.GameProfiles.route) {
-            GameProfilesScreen(
-                viewModel = gameProfilesViewModel,
-                onNavigateBack = { navController.popBackStack() }
-            )
-        }
+            composable(NavRoutes.Plugins.route) {
+                PluginScreen(
+                    viewModel = pluginViewModel,
+                    onNavigateBack = { navController.popBackStack() },
+                    onInstallPlugin = { filePickerLauncher.launch("application/zip") },
+                    onOpenWebUI = { pluginId ->
+                        navController.navigate(NavRoutes.WebUI.createRoute(pluginId))
+                    }
+                )
+            }
 
-        composable(NavRoutes.Settings.route) {
-            SettingsScreen(
-                viewModel = settingsViewModel,
-                onNavigateBack = { navController.popBackStack() }
-            )
-        }
+            composable(NavRoutes.GameProfiles.route) {
+                GameProfilesScreen(
+                    viewModel = gameProfilesViewModel,
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            }
 
-        composable(NavRoutes.ShellExecutor.route) {
-            ShellExecutorScreen(
-                onNavigateBack = { navController.popBackStack() }
-            )
-        }
+            composable(NavRoutes.Settings.route) {
+                SettingsScreen(
+                    viewModel = settingsViewModel,
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            }
 
-        composable(
-            route = NavRoutes.WebUI.route,
-            arguments = listOf(navArgument("pluginId") { type = NavType.StringType })
-        ) { backStackEntry ->
-            val pluginId = backStackEntry.arguments?.getString("pluginId") ?: ""
-            WebUIScreen(
-                pluginId = pluginId,
-                onNavigateBack = { navController.popBackStack() }
-            )
+            composable(NavRoutes.ShellExecutor.route) {
+                ShellExecutorScreen(
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            }
+
+            composable(
+                route = NavRoutes.WebUI.route,
+                arguments = listOf(navArgument("pluginId") { type = NavType.StringType })
+            ) { backStackEntry ->
+                val pluginId = backStackEntry.arguments?.getString("pluginId") ?: ""
+                WebUIScreen(
+                    pluginId = pluginId,
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            }
         }
     }
 }
-
-
