@@ -1,0 +1,94 @@
+package beta.manager.ui.viewmodel
+
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
+import beta.manager.utils.PreferencesManager
+import beta.manager.utils.Shell
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+
+class SettingsViewModel(application: Application) : AndroidViewModel(application) {
+
+    private val prefs = PreferencesManager(application)
+
+    private val _settings = MutableStateFlow(PreferencesManager.Settings())
+    val settings: StateFlow<PreferencesManager.Settings> = _settings.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            prefs.settingsFlow.collect { _settings.value = it }
+        }
+    }
+
+    fun setGamingMode(enabled: Boolean) {
+        viewModelScope.launch {
+            prefs.setGamingMode(enabled)
+            applyPerformanceTweaks()
+        }
+    }
+
+    fun setAutoStart(enabled: Boolean) {
+        viewModelScope.launch { prefs.setAutoStart(enabled) }
+    }
+
+    fun setNotifications(enabled: Boolean) {
+        viewModelScope.launch { prefs.setNotifications(enabled) }
+    }
+
+    fun setThermalControl(enabled: Boolean) {
+        viewModelScope.launch {
+            prefs.setThermalControl(enabled)
+            if (enabled) {
+                Shell.execute("sh -c 'echo performance > /sys/class/thermal/thermal_message/sconfig 2>/dev/null || echo 0 > /sys/class/thermal/thermal_zone0/mode 2>/dev/null'")
+            } else {
+                Shell.execute("sh -c 'echo disabled > /sys/class/thermal/thermal_message/sconfig 2>/dev/null || echo 1 > /sys/class/thermal/thermal_zone0/mode 2>/dev/null'")
+            }
+        }
+    }
+
+    fun setCpuGovernor(enabled: Boolean) {
+        viewModelScope.launch {
+            prefs.setCpuGovernor(enabled)
+            if (enabled) {
+                Shell.execute("for cpu in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do echo performance > \$cpu 2>/dev/null; done")
+            } else {
+                Shell.execute("for cpu in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do echo schedutil > \$cpu 2>/dev/null; done")
+            }
+        }
+    }
+
+    fun setGpuBoost(enabled: Boolean) {
+        viewModelScope.launch {
+            prefs.setGpuBoost(enabled)
+            if (enabled) {
+                Shell.execute("sh -c 'echo 1 > /sys/class/kgsl/kgsl-3d0/force_bus_on 2>/dev/null; echo 1 > /sys/class/kgsl/kgsl-3d0/force_clk_on 2>/dev/null; echo 1 > /sys/class/kgsl/kgsl-3d0/force_rail_on 2>/dev/null; echo 100 > /sys/class/kgsl/kgsl-3d0/devfreq/max_freq 2>/dev/null'")
+            } else {
+                Shell.execute("sh -c 'echo 0 > /sys/class/kgsl/kgsl-3d0/force_bus_on 2>/dev/null; echo 0 > /sys/class/kgsl/kgsl-3d0/force_clk_on 2>/dev/null; echo 0 > /sys/class/kgsl/kgsl-3d0/force_rail_on 2>/dev/null'")
+            }
+        }
+    }
+
+    fun setDebugMode(enabled: Boolean) {
+        viewModelScope.launch { prefs.setDebugMode(enabled) }
+    }
+
+    fun setBusyboxMode(enabled: Boolean) {
+        viewModelScope.launch {
+            prefs.setBusyboxMode(enabled)
+            if (enabled) {
+                Shell.execute("export ASH_STANDALONE=1; \$(pgrep -f busybox | head -1) 2>/dev/null")
+            }
+        }
+    }
+
+    private suspend fun applyPerformanceTweaks() {
+        val s = _settings.value
+        if (s.gamingMode) {
+            if (s.cpuGovernor) Shell.execute("for cpu in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do echo performance > \$cpu 2>/dev/null; done")
+            if (s.gpuBoost) Shell.execute("echo 1 > /sys/class/kgsl/kgsl-3d0/force_bus_on 2>/dev/null; echo 1 > /sys/class/kgsl/kgsl-3d0/force_clk_on 2>/dev/null")
+        }
+    }
+}

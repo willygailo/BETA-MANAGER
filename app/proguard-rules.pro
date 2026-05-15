@@ -1,0 +1,3 @@
+-keep class beta.manager.service.BetaService { *; }
+-keep class beta.manager.plugin.** { *; }
+-keep class * extends android.app.Service
