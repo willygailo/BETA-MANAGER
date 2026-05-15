@@ -9,6 +9,8 @@
     <img src="https://img.shields.io/badge/Compose-BOM_2024.12-4285F4?style=for-the-badge&logo=jetpackcompose&logoColor=white" alt="Compose">
     <img src="https://img.shields.io/badge/minSdk-26-00E676?style=for-the-badge&logo=android&logoColor=white" alt="minSdk">
     <img src="https://img.shields.io/badge/targetSdk-36-00E5FF?style=for-the-badge&logo=android&logoColor=white" alt="targetSdk">
+    <img src="https://img.shields.io/badge/DataStore-1.1.3-FF6F00?style=for-the-badge&logo=databricks&logoColor=white" alt="DataStore">
+    <img src="https://img.shields.io/badge/Shizuku-13.1.5-8B5CF6?style=for-the-badge&logo=shizuku&logoColor=white" alt="Shizuku">
   </p>
   <br>
 </div>
@@ -22,50 +24,71 @@
 
 ---
 
+<div align="center">
+
 ## 📋 TABLE OF CONTENTS
 
-- [✨ Features](#-features)
-- [📸 Screens](#-screens)
-- [🏗️ Architecture](#️-architecture)
-- [📁 Runtime Directory](#-runtime-directory)
-- [🧩 Plugin System](#-plugin-system)
-- [⚙️ Activation Flow](#️-activation-flow)
-- [🔄 Plugin Lifecycle](#-plugin-lifecycle)
-- [🌐 WebUI Flow](#-webui-flow)
-- [📦 Tech Stack](#-tech-stack)
-- [🔧 Build Instructions](#-build-instructions)
-- [📄 License](#-license)
+[✨ Features](#-features) ·
+[📸 Screens](#-screens) ·
+[🏗️ Architecture](#️-architecture) ·
+[📁 Runtime Directory](#-runtime-directory) ·
+[🧩 Plugin System](#-plugin-system) ·
+[⚙️ Activation Flow](#️-activation-flow) ·
+[🔄 Plugin Lifecycle](#-plugin-lifecycle) ·
+[🌐 WebUI Flow](#-webui-flow) ·
+[🖥️ Shell Executor](#️-shell-executor) ·
+[📦 Tech Stack](#-tech-stack) ·
+[🔧 Build Instructions](#-build-instructions) ·
+[📄 License](#-license)
+
+</div>
 
 ---
 
 ## ✨ FEATURES
 
+<div align="center">
+
 | Feature | Description |
 |---------|-------------|
 | 🧩 **Plugin System** | Flash ZIP files para mag-apply ng CPU/GPU/memory tweaks. Katulad ng Magisk/KernelSU modules — **walang root required** |
-| 🎮 **Game Profiles** | Per-app performance profile para sa MLBB, COD Mobile, PUBG, Genshin Impact, Wild Rift, Farlight 84, at marami pa |
+| 🎮 **Game Profiles** | Per-app performance profile para sa MLBB, COD Mobile, PUBG, Genshin Impact, Wild Rift, Farlight 84, at marami pa. Auto-detect installed games |
 | 📡 **Multi-Mode Activation** | Wireless Debugging · ADB USB · TCP Mode · Root/SU |
 | 🌐 **WebUI Support** | KernelSU-compatible JavaScript bridge (`ksu.exec`, `ksu.toast`) para sa plugin interfaces |
+| 🖥️ **Shell Executor** | Interactive terminal sa app para mag-run ng shell commands via AIDL |
 | 🔥 **Warm Boot** | Hot restart ng service nang hindi nagre-reboot ng device |
 | 🎨 **Cyberpunk Dark Theme** | Neon cyan/pink/purple gaming aesthetic UI |
 | ⚡ **Boot Automation** | Auto-start service at mag-load ng plugins pag-on ng device |
 | 📊 **Real-time Status** | Service running indicator, plugin stats, activation log |
 | 🛡️ **ADB-Level Privileges** | Gumagana sa ilalim ng `com.android.shell` — secure at hindi kailangan ng root |
+| 🚨 **Crash Handling** | Global exception handler + detailed crash report screen |
+| 💾 **Persistent Settings** | DataStore-backed toggles na tumatagal kahit mag-restart ang app |
+| 🔄 **AxManager Compatible** | Supports both `betaPlugin` at `axeronPlugin` format, auto-scans AxManager plugins directory |
+
+</div>
 
 ---
 
 ## 📸 SCREENS
 
+<div align="center">
+
 | Screen | Preview | Description |
 |--------|---------|-------------|
-| 🏠 **Home** | | Service status (running/stopped), plugin count, activation mode selector (Wireless/ADB/TCP/Root), quick actions grid |
-| 📦 **Plugins** | | Listahan ng naka-install na plugins, toggle enable/disable, remove, at "Action" button para sa plugin scripts |
-| 🎯 **Game Profiles** | | Per-game performance profiles. Apply CPU governor, GPU boost, at memory optimization per app |
-| ⚙️ **Settings** | | Gaming mode toggle, auto-start, thermal throttle control, CPU governor override, GPU boost, debug mode |
+| 🏠 **Home** | | Service status (running/stopped), plugin count, activation mode selector (Wireless/ADB/TCP/Root), quick actions grid, **Game Boost button** |
+| 📦 **Plugins** | | Listahan ng naka-install na plugins, toggle enable/disable, remove, Action button, **WebUI button** |
+| 🎯 **Game Profiles** | | Per-game performance profiles. Auto-detect installed games, persistent toggle settings |
+| ⚙️ **Settings** | | Gaming mode toggle, auto-start, thermal throttle control, CPU governor override, GPU boost, debug mode — **all functional** |
+| 🖥️ **Shell** | | Interactive terminal na may command history, connected via AIDL sa BetaService |
+| 🌐 **WebUI** | | WebView na naglo-load ng plugin `webroot/index.html` na may `ksu.exec` JS bridge |
+
+</div>
 
 ---
 
 ## 🏗️ ARCHITECTURE
+
+<div align="center">
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
@@ -79,12 +102,15 @@
 │  │       ├── 🏠 HomeScreen                                  │    │
 │  │       ├── 📦 PluginScreen                                │    │
 │  │       ├── 🎯 GameProfilesScreen                          │    │
-│  │       └── ⚙️ SettingsScreen                              │    │
+│  │       ├── ⚙️ SettingsScreen                              │    │
+│  │       ├── 🖥️ ShellExecutorScreen                         │    │
+│  │       └── 🌐 WebUIScreen                                 │    │
 │  └──────────────────┬──────────────────────────────────────┘    │
 │                     │ observes                                   │
 │  ┌──────────────────▼──────────────────────────────────────┐    │
 │  │               VIEWMODEL LAYER                           │    │
-│  │     (StateFlow / Coroutines / Dispatchers.IO)           │    │
+│  │  (HomeViewModel · PluginViewModel · SettingsViewModel    │    │
+│  │   GameProfilesViewModel · StateFlow + Coroutines)       │    │
 │  └──────────────────┬──────────────────────────────────────┘    │
 │                     │ calls                                     │
 │  ┌──────────────────▼──────────────────────────────────────┐    │
@@ -96,11 +122,17 @@
 │  │   📦 PluginManager (scan / enable / disable / remove)    │    │
 │  │   📥 PluginInstaller (ZIP extract / validate / deploy)   │    │
 │  │   ⌨️ Shell (command execution engine)                    │    │
+│  │   💾 PreferencesManager (DataStore persistence)          │    │
+│  │   🚨 CrashReportActivity (global exception handler)      │    │
 │  └─────────────────────────────────────────────────────────┘    │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
+</div>
+
 ### 🚀 End-to-End Flow
+
+<div align="center">
 
 ```
 📱 User installs APK
@@ -127,11 +159,15 @@
 ✅  System ready! Gaming mode activated.
 ```
 
+</div>
+
 ---
 
 ## 📁 RUNTIME DIRECTORY
 
 Pagkatapos ma-activate, gumagawa ang Beta Manager ng working directory sa device:
+
+<div align="center">
 
 ```
 📂 /data/user_de/0/com.android.shell/beta/
@@ -158,6 +194,8 @@ Pagkatapos ma-activate, gumagawa ang Beta Manager ng working directory sa device
 └── 📁 logs/                     ← Service logs
 ```
 
+</div>
+
 > **💡 Why `com.android.shell`?**  
 > ADB runs under the `com.android.shell` user. Through this, Beta Manager gets ADB-level permissions **without needing root**.
 
@@ -166,6 +204,8 @@ Pagkatapos ma-activate, gumagawa ang Beta Manager ng working directory sa device
 ## 🧩 PLUGIN SYSTEM
 
 ### 📦 ZIP Structure
+
+<div align="center">
 
 ```
 my_perf_module.zip
@@ -182,6 +222,8 @@ my_perf_module.zip
     └── 📄 index.html      ← 🌐 WebUI page
 ```
 
+</div>
+
 ### 📝 module.prop Format
 
 ```properties
@@ -194,14 +236,21 @@ description=CPU/GPU optimization module
 betaPlugin=1          ← Must be <= Beta Manager server version
 ```
 
+> **🔄 AxManager Compatible:** Pwedeng gumamit ng `axeronPlugin` imbes na `betaPlugin`.  
+> Auto-detect ng Beta Manager kung alin ang present.
+
 ### 🌍 Environment Variables
 
 Available sa lahat ng plugin scripts:
+
+<div align="center">
 
 | Variable | Value | Description |
 |----------|-------|-------------|
 | `BETA` | `true` | ✅ Confirms running under Beta Manager |
 | `BETAVER` | `int` | 📊 Server version (e.g. `10001`) |
+| `AXERON` | `true` | 🔄 AxManager compatibility flag |
+| `AXERONVER` | `int` | 🔄 AxManager version (same as BETAVER) |
 | `MODDIR` | `path` | 📂 Base path ng module |
 | `MODPATH` | `path` | 📂 Install target (customize.sh only) |
 | `ARCH` | `arm/arm64/x86/x64` | 🖥️ CPU architecture |
@@ -209,9 +258,13 @@ Available sa lahat ng plugin scripts:
 | `API` | `int` | 📱 Android API level (e.g. `34`) |
 | `BOOTMODE` | `true` | 🚀 Always true under Beta Manager |
 
+</div>
+
 ---
 
 ## ⚙️ ACTIVATION FLOW
+
+<div align="center">
 
 ```
 📱 User opens Beta Manager
@@ -255,9 +308,13 @@ Available sa lahat ng plugin scripts:
         🔄 Scanning plugins...
 ```
 
+</div>
+
 ---
 
 ## 🔄 PLUGIN LIFECYCLE
+
+<div align="center">
 
 ```
 ┌──────────────────────────────────────────────────────────┐
@@ -265,7 +322,7 @@ Available sa lahat ng plugin scripts:
 │                                                           │
 │  User selects ZIP ──► Validate module.prop                │
 │      │               ├── Check 'id' format               │
-│      │               ├── Check betaPlugin version         │
+│      │               ├── Check betaPlugin/axeronPlugin    │
 │      │               └── Validate required fields         │
 │      ▼                                                    │
 │  Extract ZIP ──► Run customize.sh ──► Deploy to plugins/  │
@@ -304,9 +361,13 @@ Available sa lahat ng plugin scripts:
 └──────────────────────────────────────────────────────────┘
 ```
 
+</div>
+
 ---
 
 ## 🌐 WEBUI FLOW
+
+<div align="center">
 
 ```
 Plugin may webroot/index.html
@@ -329,10 +390,48 @@ JavaScript can call shell commands via:
         └── 🔲 ksu.fullScreen(bool) → UI toggle
 ```
 
+</div>
+
 > **⚡ Difference vs KernelSU:**  
 > - Permissions: ADB-level, not root  
 > - `webroot` path: local to plugin directory  
 > - No need for `/data/adb/modules/<id>/webroot`
+
+---
+
+## 🖥️ SHELL EXECUTOR
+
+<div align="center">
+
+```
+┌─────────────────────────────────────────────┐
+│  🖥️  Shell Executor                         │
+├─────────────────────────────────────────────┤
+│  $ echo "Hello from Beta Manager!"          │
+│  Hello from Beta Manager!                   │
+│                                             │
+│  $ cat /proc/cpuinfo | grep processor       │
+│  processor  : 0                             │
+│  processor  : 1                             │
+│  processor  : 2                             │
+│  processor  : 3                             │
+│                                             │
+│  $ perf_status                              │
+│  CPU: performance                           │
+│  GPU: boosted                               │
+│  Temp: 42°C                                 │
+│                                             │
+├─────────────────────────────────────────────┤
+│  ┌───────────────────────────────────────┐  │
+│  │  Type command...                    ▶  │  │
+│  └───────────────────────────────────────┘  │
+└─────────────────────────────────────────────┘
+```
+
+</div>
+
+> Run shell commands directly from the app with AIDL-backed execution.  
+> May command history (last 100), ANSI output, at real-time feedback.
 
 ---
 
@@ -349,6 +448,7 @@ JavaScript can call shell commands via:
 | 🔑 **Privilege** | Shizuku API | 13.1.5 |
 | 🔄 **Async** | Kotlin Coroutines | 1.9.0 |
 | 🧭 **Navigation** | Navigation Compose | 2.8.5 |
+| 💾 **Persistence** | DataStore Preferences | 1.1.3 |
 | ⚙️ **Build** | Gradle + AGP | 8.11.1 / 8.7.3 |
 | 📱 **Minimum SDK** | Android 8.0 (Oreo) | API 26 |
 | 🎯 **Target SDK** | Android 16 | API 36 |
@@ -361,7 +461,7 @@ JavaScript can call shell commands via:
 
 ```bash
 # 📥 Clone the repository
-git clone <repo-url> BetaManager
+git clone https://github.com/willygailo/BETA-MANAGER.git BetaManager
 cd BetaManager
 
 # 🏗️ Build debug APK
@@ -373,9 +473,9 @@ export ANDROID_HOME=/path/to/android-sdk
 #    app/build/outputs/apk/debug/app-debug.apk
 ```
 
-### 📋 Requirements
-
 <div align="center">
+
+### 📋 Requirements
 
 | Tool | Version |
 |------|---------|
@@ -389,6 +489,8 @@ export ANDROID_HOME=/path/to/android-sdk
 
 ## 📄 LICENSE
 
+<div align="center">
+
 ```
 ╔══════════════════════════════════════════════════════╗
 ║              BETA MANAGER v1.0.0                     ║
@@ -398,6 +500,8 @@ export ANDROID_HOME=/path/to/android-sdk
 ║              All Rights Reserved                     ║
 ╚══════════════════════════════════════════════════════╝
 ```
+
+</div>
 
 ---
 
@@ -414,5 +518,13 @@ export ANDROID_HOME=/path/to/android-sdk
     <img src="https://img.shields.io/badge/Jetpack_Compose-4285F4?style=flat-square&logo=jetpackcompose&logoColor=white" alt="Compose">
     <img src="https://img.shields.io/badge/Material_3-0066FF?style=flat-square&logo=materialdesign&logoColor=white" alt="Material3">
     <img src="https://img.shields.io/badge/Android-34A853?style=flat-square&logo=android&logoColor=white" alt="Android">
+    <img src="https://img.shields.io/badge/Shizuku-8B5CF6?style=flat-square&logo=shizuku&logoColor=white" alt="Shizuku">
+  </p>
+  <br>
+  <p>
+    <a href="https://github.com/willygailo/BETA-MANAGER">GitHub</a> ·
+    <a href="#-features">Features</a> ·
+    <a href="#-screens">Screens</a> ·
+    <a href="#️-architecture">Architecture</a>
   </p>
 </div>
