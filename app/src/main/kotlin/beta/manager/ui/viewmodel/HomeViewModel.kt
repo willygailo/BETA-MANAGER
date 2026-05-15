@@ -12,6 +12,8 @@ import beta.manager.IBetaService
 import beta.manager.adb.ActivationMode
 import beta.manager.adb.AdbActivator
 import beta.manager.adb.AdbClient
+import beta.manager.plugin.PluginInfo
+import beta.manager.plugin.PluginManager
 import beta.manager.utils.PreferencesManager
 import beta.manager.utils.Shell
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -22,14 +24,20 @@ import kotlinx.coroutines.launch
 data class HomeUiState(
     val isServiceRunning: Boolean = false,
     val pluginCount: Int = 0,
-    val profileCount: Int = 0,
     val activeCount: Int = 0,
+    val profileCount: Int = 0,
     val activeMode: String = "N/A",
     val availableModes: List<ActivationMode> = emptyList(),
     val isActivating: Boolean = false,
     val activationLog: String = "",
     val isGameBoosted: Boolean = false,
-    val isBoosting: Boolean = false
+    val isBoosting: Boolean = false,
+    val rootType: String = "N/A",
+    val autoDetectedMode: String = "",
+    val modules: List<PluginInfo> = emptyList(),
+    val isLoaded: Boolean = false,
+    val isCleaning: Boolean = false,
+    val cleanResult: String = ""
 )
 
 class HomeViewModel(application: Application) : AndroidViewModel(application) {
@@ -40,6 +48,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     private val activator = AdbActivator(application)
     private val client = AdbClient(application)
     private val prefs = PreferencesManager(application)
+    private val pluginManager = PluginManager("/data/user_de/0/com.android.shell/beta/plugins/")
     private var betaService: IBetaService? = null
 
     private val connection = object : ServiceConnection {
@@ -55,11 +64,24 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         checkModes()
-        checkService()
         viewModelScope.launch {
             prefs.settingsFlow.collect { s ->
                 _uiState.value = _uiState.value.copy(isGameBoosted = s.gameBoostActive)
             }
+        }
+        viewModelScope.launch {
+            val rootType = Shell.detectRootType()
+            val detectedMode = activator.autoDetectMode()
+            _uiState.value = _uiState.value.copy(
+                rootType = rootType.name,
+                autoDetectedMode = detectedMode.name
+            )
+            checkService()
+            scanModules()
+            if (!_uiState.value.isServiceRunning) {
+                autoActivate()
+            }
+            _uiState.value = _uiState.value.copy(isLoaded = true)
         }
     }
 
@@ -71,6 +93,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             if (modes[ActivationMode.ADB_USB] == true) available.add(ActivationMode.ADB_USB)
             if (modes[ActivationMode.TCP_MODE] == true) available.add(ActivationMode.TCP_MODE)
             if (modes[ActivationMode.ROOT_SU] == true) available.add(ActivationMode.ROOT_SU)
+            if (modes[ActivationMode.SHIZUKU] == true) available.add(ActivationMode.SHIZUKU)
             if (available.isEmpty()) available.addAll(ActivationMode.entries)
             _uiState.value = _uiState.value.copy(availableModes = available)
         }
@@ -86,18 +109,31 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     val plugins = service?.listPlugins()?.toList() ?: emptyList()
                     _uiState.value = _uiState.value.copy(
                         pluginCount = plugins.size,
-                        activeCount = plugins.size
+                        activeCount = plugins.size,
                     )
                 }
             } catch (_: Exception) {}
         }
     }
 
-    fun activate(mode: ActivationMode) {
+    private fun scanModules() {
         viewModelScope.launch {
+            val modules = pluginManager.scanPlugins()
+            _uiState.value = _uiState.value.copy(
+                modules = modules,
+                pluginCount = modules.size,
+                activeCount = modules.count { it.isEnabled }
+            )
+        }
+    }
+
+    fun autoActivate() {
+        viewModelScope.launch {
+            val mode = activator.autoDetectMode()
+            val modeName = mode.name.lowercase().replace('_', ' ')
             _uiState.value = _uiState.value.copy(
                 isActivating = true,
-                activationLog = "Activating via ${mode.name.lowercase().replace('_', ' ')}..."
+                activationLog = "Auto-detected: $modeName..."
             )
             val result = activator.activate(mode)
             _uiState.value = _uiState.value.copy(
@@ -107,10 +143,42 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 activationLog = if (result.success) "✓ ${result.message}" else "✗ ${result.message}"
             )
             if (result.success) refreshStatus()
+            scanModules()
         }
     }
 
-    fun refreshStatus() { checkService() }
+    fun activate(mode: ActivationMode) {
+        viewModelScope.launch {
+            val modeName = mode.name.lowercase().replace('_', ' ')
+            _uiState.value = _uiState.value.copy(
+                isActivating = true,
+                activationLog = "Activating via $modeName..."
+            )
+            val result = activator.activate(mode)
+            _uiState.value = _uiState.value.copy(
+                isActivating = false,
+                isServiceRunning = result.success,
+                activeMode = if (result.success) mode.name else "N/A",
+                activationLog = if (result.success) "✓ ${result.message}" else "✗ ${result.message}"
+            )
+            if (result.success) refreshStatus()
+            scanModules()
+        }
+    }
+
+    fun refreshStatus() { checkService(); scanModules() }
+
+    fun cleanAll() {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isCleaning = true, cleanResult = "")
+            val cleaned = pluginManager.cleanAllMarked()
+            _uiState.value = _uiState.value.copy(
+                isCleaning = false,
+                cleanResult = "Cleaned $cleaned module(s)"
+            )
+            scanModules()
+        }
+    }
 
     fun toggleGameBoost() {
         viewModelScope.launch {

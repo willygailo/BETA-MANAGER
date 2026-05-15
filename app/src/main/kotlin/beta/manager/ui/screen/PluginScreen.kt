@@ -1,5 +1,6 @@
 package beta.manager.ui.screen
 
+import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -40,6 +41,13 @@ fun PluginScreen(
         }
     }
 
+    LaunchedEffect(uiState.fixResult) {
+        uiState.fixResult?.let {
+            snackbarHostState.showSnackbar(it)
+            viewModel.clearFixResult()
+        }
+    }
+
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
@@ -54,6 +62,18 @@ fun PluginScreen(
                         )
                     }
                 },
+                actions = {
+                    IconButton(
+                        onClick = { viewModel.fixUpdateAll() },
+                        enabled = !uiState.isFixing
+                    ) {
+                        Icon(
+                            imageVector = if (uiState.isFixing) Icons.Filled.Sync else Icons.Filled.Build,
+                            contentDescription = "Fix/Update All",
+                            tint = if (uiState.isFixing) NeonGreen else NeonCyan
+                        )
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = DarkBackground,
                     titleContentColor = TextPrimary
@@ -63,7 +83,7 @@ fun PluginScreen(
         floatingActionButton = {
             ExtendedFloatingActionButton(
                 onClick = {
-                    if (!uiState.isInstalling) onInstallPlugin()
+                    if (!uiState.isInstalling && !uiState.isFixing) onInstallPlugin()
                 },
                 containerColor = NeonCyan,
                 contentColor = DarkBackground,
@@ -96,6 +116,34 @@ fun PluginScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
+            if (uiState.isFixing) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(NeonCyan.copy(alpha = 0.1f))
+                        .padding(12.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            color = NeonCyan,
+                            strokeWidth = 2.dp
+                        )
+                        Text(
+                            "Fixing/updating all plugins...",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = NeonCyan
+                        )
+                    }
+                }
+            }
+
             if (uiState.isLoading) {
                 Box(
                     modifier = Modifier.fillMaxSize(),

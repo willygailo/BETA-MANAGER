@@ -1,3 +1,8 @@
 -keep class beta.manager.service.BetaService { *; }
 -keep class beta.manager.plugin.** { *; }
+-keep class beta.manager.utils.** { *; }
+-keep class beta.manager.adb.** { *; }
 -keep class * extends android.app.Service
+-keep class rikka.shizuku.** { *; }
+-keep class android.os.** { *; }
+-dontwarn rikka.shizuku.**

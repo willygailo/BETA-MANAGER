@@ -18,11 +18,39 @@ class PluginInstaller(
     )
 
     suspend fun install(zipPath: String): Boolean {
-        val result = installInternal(zipPath)
+        val result = installInternal(zipPath, flashToMagisk = false)
         return result.success
     }
 
-    private suspend fun installInternal(zipPath: String): InstallResult {
+    suspend fun installToMagisk(zipPath: String): InstallResult {
+        val magiskModules = listOf(
+            "/data/adb/modules/",
+            "/data/adb/modules_update/"
+        )
+        val targetDir = magiskModules.firstOrNull { File(it).exists() }
+            ?: return InstallResult(false, "Magisk modules directory not found")
+
+        val result = installInternal(zipPath, flashToMagisk = true, magiskTarget = targetDir)
+        return result
+    }
+
+    suspend fun installToKSU(zipPath: String): InstallResult {
+        val ksuModules = listOf(
+            "/data/adb/ksu/modules/",
+            "/data/adb/modules/"
+        )
+        val targetDir = ksuModules.firstOrNull { File(it).exists() }
+            ?: return InstallResult(false, "KernelSU modules directory not found")
+
+        val result = installInternal(zipPath, flashToMagisk = true, magiskTarget = targetDir)
+        return result
+    }
+
+    private suspend fun installInternal(
+        zipPath: String,
+        flashToMagisk: Boolean = false,
+        magiskTarget: String? = null
+    ): InstallResult {
         val zipFile = File(zipPath)
         if (!zipFile.exists()) {
             return InstallResult(false, "ZIP file not found: $zipPath")
@@ -45,8 +73,9 @@ class PluginInstaller(
             val betaVersion = props["betaPlugin"]?.toIntOrNull()
             val axeronVersion = props["axeronPlugin"]?.toIntOrNull()
             val minVersion = betaVersion ?: axeronVersion ?: 0
+            val newVersionCode = props["versionCode"]?.toIntOrNull() ?: 1
 
-            if (minVersion > PluginManager.SERVER_VERSION) {
+            if (!flashToMagisk && minVersion > PluginManager.SERVER_VERSION) {
                 return InstallResult(
                     false,
                     "Plugin requires newer version (need ${minVersion}, have ${PluginManager.SERVER_VERSION})"
@@ -57,33 +86,40 @@ class PluginInstaller(
                 return InstallResult(false, "Invalid plugin ID format: $pluginId")
             }
 
-            val customizeSh = File(tempDir, "customize.sh")
-            if (customizeSh.exists()) {
-            val env: Map<String, String> = mapOf(
-                "BETA" to "true",
-                "BETAVER" to "${PluginManager.SERVER_VERSION}",
-                "AXERON" to "true",
-                "AXERONVER" to "${PluginManager.SERVER_VERSION}",
-                "MODPATH" to "${pluginsDir}${pluginId}",
-                "MODDIR" to "${pluginsDir}${pluginId}",
-                "ARCH" to (System.getProperty("os.arch") ?: "arm64"),
-                "API" to android.os.Build.VERSION.SDK_INT.toString(),
-                "IS64BIT" to if (android.os.Process.is64Bit()) "true" else "false",
-                "BOOTMODE" to "true",
-                "SKIPUNZIP" to ""
-            )
-            val envStr = env.entries.joinToString(" ") { (k, v) -> "${k}=${v}" }
-            Shell.execute("$envStr sh '${customizeSh.absolutePath}'")
+            val targetDir = if (flashToMagisk && magiskTarget != null) {
+                "${magiskTarget}${pluginId}"
+            } else {
+                "${pluginsDir}${pluginId}"
             }
 
-            val pluginDir = File(pluginsDir, pluginId)
+            val customizeSh = File(tempDir, "customize.sh")
+            if (customizeSh.exists()) {
+                val env: Map<String, String> = mapOf(
+                    "BETA" to "true",
+                    "BETAVER" to "${PluginManager.SERVER_VERSION}",
+                    "AXERON" to "true",
+                    "AXERONVER" to "${PluginManager.SERVER_VERSION}",
+                    "MODPATH" to targetDir,
+                    "MODDIR" to targetDir,
+                    "ARCH" to (System.getProperty("os.arch") ?: "arm64"),
+                    "API" to android.os.Build.VERSION.SDK_INT.toString(),
+                    "IS64BIT" to if (android.os.Process.is64Bit()) "true" else "false",
+                    "BOOTMODE" to "true",
+                    "SKIPUNZIP" to ""
+                )
+                val envStr = env.entries.joinToString(" ") { (k, v) -> "${k}=${v}" }
+                Shell.execute("$envStr sh '${customizeSh.absolutePath}'")
+            }
+
+            val pluginDir = File(targetDir)
             if (pluginDir.exists()) {
                 pluginDir.deleteRecursively()
             }
             tempDir.copyRecursively(pluginDir, overwrite = true)
             File(pluginDir, "disable")?.delete()
 
-            return InstallResult(true, "Plugin installed successfully", pluginId)
+            val action = if (flashToMagisk) "Flashed to ${pluginDir.parentFile?.name}" else "Installed"
+            return InstallResult(true, "$action successfully: ${props["name"] ?: pluginId} (v${props["version"] ?: "1.0"})", pluginId)
 
         } catch (e: Exception) {
             return InstallResult(false, "Installation failed: ${e.message}")
@@ -92,6 +128,62 @@ class PluginInstaller(
                 tempDir.deleteRecursively()
             }
         }
+    }
+
+    suspend fun checkForUpdates(plugins: List<PluginInfo>): List<UpdateInfo> {
+        val updates = mutableListOf<UpdateInfo>()
+        for (plugin in plugins) {
+            val pluginDir = File(pluginsDir, plugin.id)
+            val propFile = File(pluginDir, "module.prop")
+            if (!propFile.exists()) continue
+
+            val props = parseModuleProp(propFile)
+            val versionCode = props["versionCode"]?.toIntOrNull() ?: 1
+            val name = props["name"] ?: plugin.id
+
+            updates.add(UpdateInfo(
+                id = plugin.id,
+                name = name,
+                currentVersion = plugin.version,
+                currentVersionCode = plugin.versionCode,
+                newVersionCode = versionCode,
+                needsUpdate = versionCode > plugin.versionCode
+            ))
+        }
+        return updates
+    }
+
+    suspend fun fixPlugin(pluginId: String): Boolean {
+        val pluginDir = File(pluginsDir, pluginId)
+        if (!pluginDir.exists()) return false
+
+        val propFile = File(pluginDir, "module.prop")
+        if (!propFile.exists()) return false
+
+        val updateProps = parseModuleProp(propFile)
+
+        File(pluginDir, "disable").delete()
+        File(pluginDir, "remove").delete()
+
+        val shFiles = pluginDir.listFiles { f -> f.extension == "sh" } ?: emptyArray()
+        for (sh in shFiles) {
+            sh.setExecutable(true)
+        }
+
+        val webrootDir = File(pluginDir, "webroot")
+        if (webrootDir.exists()) {
+            webrootDir.listFiles()?.forEach { it.setExecutable(true) }
+        }
+
+        return true
+    }
+
+    suspend fun fixAllPlugins(plugins: List<PluginInfo>): Int {
+        var fixed = 0
+        for (plugin in plugins) {
+            if (fixPlugin(plugin.id)) fixed++
+        }
+        return fixed
     }
 
     private fun extractZip(zipFile: File, targetDir: File) {

@@ -6,14 +6,14 @@ plugins {
 
 android {
     namespace = "beta.manager"
-    compileSdk = 36
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "beta.manager"
         minSdk = 26
-        targetSdk = 36
-        versionCode = 10002
-        versionName = "1.1.0"
+        targetSdk = 34
+        versionCode = 10003
+        versionName = "1.2.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

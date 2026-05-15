@@ -4,6 +4,7 @@ import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -23,15 +24,17 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.graphics.Color
 import beta.manager.adb.ActivationMode
+import beta.manager.plugin.PluginInfo
+import beta.manager.plugin.PluginSource
 import beta.manager.ui.theme.*
 import beta.manager.ui.viewmodel.HomeViewModel
-import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     viewModel: HomeViewModel,
-    onNavigateToShell: () -> Unit
+    onNavigateToShell: () -> Unit,
+    onInstallPlugin: (() -> Unit)? = null
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
@@ -39,11 +42,21 @@ fun HomeScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Text(
-                        "Beta Manager",
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 0.5.sp
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(
+                                    Brush.linearGradient(listOf(NeonCyan, NeonPurple))
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("β", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 16.sp)
+                        }
+                        Spacer(Modifier.width(10.dp))
+                        Text("Beta Manager", fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp)
+                    }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = DarkBackground,
@@ -57,22 +70,61 @@ fun HomeScreen(
                 .fillMaxSize()
                 .padding(padding)
                 .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-            contentPadding = PaddingValues(bottom = 16.dp)
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+            contentPadding = PaddingValues(bottom = 20.dp)
         ) {
-            item { WelcomeHeader() }
-            item { ServiceStatusCard(uiState.isServiceRunning, uiState.activeMode) }
-            item { StatsRow(uiState) }
-            item { ActivationSection(uiState, viewModel::activate) }
-            item { GameBoostCard(uiState, viewModel::toggleGameBoost) }
-            item {
-                Text(
-                    "Quick Tools",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = TextPrimary
-                )
+            item { ServiceStatusHeader(uiState) }
+
+            if (!uiState.isServiceRunning && !uiState.isActivating) {
+                item { AutoActivateCard(uiState, viewModel::autoActivate) }
             }
-            item { QuickToolsRow(onNavigateToShell) }
+
+            item { QuickActionsRow(uiState, viewModel, onNavigateToShell, onInstallPlugin) }
+
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            Icons.Filled.Extension,
+                            contentDescription = null,
+                            tint = NeonCyan,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            "Modules",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = TextPrimary
+                        )
+                    }
+                    Text(
+                        "${uiState.modules.size} total",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = TextTertiary
+                    )
+                }
+            }
+
+            if (uiState.modules.isEmpty()) {
+                item { EmptyModulesCard() }
+            } else {
+                items(uiState.modules) { module ->
+                    ModuleCard(
+                        plugin = module,
+                        onToggle = {
+                            viewModel.activate(ActivationMode.ROOT_SU)
+                            viewModel.refreshStatus()
+                        },
+                        onRemove = { viewModel.cleanAll() }
+                    )
+                }
+            }
+
             if (uiState.activationLog.isNotBlank()) {
                 item { ActivationLogCard(uiState.activationLog) }
             }
@@ -81,24 +133,7 @@ fun HomeScreen(
 }
 
 @Composable
-private fun WelcomeHeader() {
-    Column(modifier = Modifier.padding(top = 8.dp)) {
-        Text(
-            "Welcome!",
-            style = MaterialTheme.typography.displayMedium,
-            color = TextPrimary
-        )
-        Spacer(Modifier.height(4.dp))
-        Text(
-            "Optimize your gaming performance",
-            style = MaterialTheme.typography.bodyLarge,
-            color = TextSecondary
-        )
-    }
-}
-
-@Composable
-private fun ServiceStatusCard(isRunning: Boolean, activeMode: String) {
+private fun ServiceStatusHeader(state: beta.manager.ui.viewmodel.HomeUiState) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
@@ -106,46 +141,59 @@ private fun ServiceStatusCard(isRunning: Boolean, activeMode: String) {
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(20.dp),
+            modifier = Modifier.fillMaxWidth().padding(20.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Box(
                 modifier = Modifier
-                    .size(48.dp)
+                    .size(52.dp)
                     .clip(CircleShape)
                     .background(
-                        if (isRunning) Brush.linearGradient(listOf(NeonGreen, NeonGreen.copy(alpha = 0.4f)))
-                        else Brush.linearGradient(listOf(NeonRed, NeonRed.copy(alpha = 0.4f)))
+                        if (state.isServiceRunning)
+                            Brush.linearGradient(listOf(NeonGreen, NeonGreen.copy(alpha = 0.3f)))
+                        else
+                            Brush.linearGradient(listOf(NeonRed, NeonRed.copy(alpha = 0.3f)))
                     ),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = if (isRunning) Icons.Filled.CheckCircle else Icons.Filled.StopCircle,
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier.size(24.dp)
-                )
+                if (state.isActivating) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(26.dp),
+                        color = Color.White,
+                        strokeWidth = 2.5.dp
+                    )
+                } else {
+                    Icon(
+                        imageVector = if (state.isServiceRunning) Icons.Filled.CheckCircle else Icons.Filled.StopCircle,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(26.dp)
+                    )
+                }
             }
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    if (isRunning) "Service Running" else "Service Stopped",
+                    if (state.isServiceRunning) "Service Running" else "Service Stopped",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = if (isRunning) NeonGreen else NeonRed
+                    color = if (state.isServiceRunning) NeonGreen else NeonRed
                 )
-                Text(
-                    "Mode: $activeMode",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = TextTertiary
-                )
+                Spacer(Modifier.height(2.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (state.activeMode != "N/A") {
+                        LabelBadge(state.activeMode.lowercase().replace('_', ' '), NeonCyan)
+                    }
+                    LabelBadge(state.rootType.lowercase(), NeonPurple)
+                    if (state.isGameBoosted) {
+                        LabelBadge("boosted", NeonGreen)
+                    }
+                }
             }
-            if (isRunning) {
+            if (state.isServiceRunning) {
                 Box(
                     modifier = Modifier
-                        .size(10.dp)
+                        .size(12.dp)
                         .clip(CircleShape)
                         .background(NeonGreen)
                 )
@@ -155,283 +203,282 @@ private fun ServiceStatusCard(isRunning: Boolean, activeMode: String) {
 }
 
 @Composable
-private fun StatsRow(state: beta.manager.ui.viewmodel.HomeUiState) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
+private fun LabelBadge(text: String, color: Color) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(6.dp))
+            .background(color.copy(alpha = 0.15f))
+            .padding(horizontal = 8.dp, vertical = 2.dp)
     ) {
-        StatCard("Plugins", "${state.pluginCount}", NeonCyan, Modifier.weight(1f))
-        StatCard("Active", "${state.activeCount}", NeonGreen, Modifier.weight(1f))
-        StatCard("Profiles", "${state.profileCount}", NeonPurple, Modifier.weight(1f))
+        Text(
+            text,
+            style = MaterialTheme.typography.labelSmall,
+            color = color,
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 10.sp
+        )
     }
 }
 
 @Composable
-private fun StatCard(label: String, value: String, color: androidx.compose.ui.graphics.Color, modifier: Modifier) {
-    Card(
-        modifier = modifier,
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = DarkCard),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(
-                value,
-                style = MaterialTheme.typography.headlineLarge,
-                fontWeight = FontWeight.Bold,
-                color = color
-            )
-            Spacer(Modifier.height(4.dp))
-            Text(
-                label,
-                style = MaterialTheme.typography.labelMedium,
-                color = TextTertiary
-            )
-        }
-    }
-}
-
-@Composable
-private fun ActivationSection(
+private fun AutoActivateCard(
     state: beta.manager.ui.viewmodel.HomeUiState,
-    onActivate: (ActivationMode) -> Unit
+    onAutoActivate: () -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = DarkCard),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = DarkSurface)
     ) {
-        Column(modifier = Modifier.padding(20.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = Icons.Filled.PowerSettingsNew,
-                    contentDescription = null,
-                    tint = NeonOrange,
-                    modifier = Modifier.size(20.dp)
-                )
-                Spacer(Modifier.width(8.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    "Activate Service",
-                    style = MaterialTheme.typography.titleMedium,
+                    "Tap to activate",
+                    style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
                     color = TextPrimary
                 )
-            }
-            Spacer(Modifier.height(12.dp))
-
-            val modeInfo = mapOf(
-                ActivationMode.WIRELESS_DEBUG to "Wireless Debug",
-                ActivationMode.ADB_USB to "ADB (USB)",
-                ActivationMode.TCP_MODE to "TCP Mode",
-                ActivationMode.ROOT_SU to "Root / SU"
-            )
-            val modeIcons = mapOf(
-                ActivationMode.WIRELESS_DEBUG to Icons.Outlined.Wifi,
-                ActivationMode.ADB_USB to Icons.Outlined.Usb,
-                ActivationMode.TCP_MODE to Icons.Outlined.Lan,
-                ActivationMode.ROOT_SU to Icons.Outlined.Security
-            )
-            val modeColors = mapOf(
-                ActivationMode.WIRELESS_DEBUG to NeonCyan,
-                ActivationMode.ADB_USB to NeonGreen,
-                ActivationMode.TCP_MODE to NeonOrange,
-                ActivationMode.ROOT_SU to NeonPurple
-            )
-
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                state.availableModes.forEach { mode ->
-                    val color = modeColors[mode] ?: NeonCyan
-                    OutlinedButton(
-                        onClick = { onActivate(mode) },
-                        enabled = !state.isActivating,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(48.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        border = ButtonDefaults.outlinedButtonBorder(enabled = !state.isActivating),
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = color
-                        )
-                    ) {
-                        Icon(
-                            imageVector = modeIcons[mode] ?: Icons.Outlined.PlayArrow,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        Text(
-                            modeInfo[mode] ?: mode.name,
-                            fontWeight = FontWeight.SemiBold,
-                            modifier = Modifier.weight(1f)
-                        )
-                        if (state.isActivating) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(16.dp),
-                                color = color,
-                                strokeWidth = 2.dp
-                            )
-                        } else {
-                            Icon(
-                                imageVector = Icons.Filled.PlayArrow,
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun GameBoostCard(
-    state: beta.manager.ui.viewmodel.HomeUiState,
-    onToggle: () -> Unit
-) {
-    Card(
-        onClick = { if (!state.isBoosting) onToggle() },
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = if (state.isGameBoosted) DarkCard else DarkCard
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(20.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(52.dp)
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(
-                        if (state.isGameBoosted)
-                            Brush.linearGradient(listOf(NeonGreen, NeonGreen.copy(alpha = 0.3f)))
-                        else
-                            Brush.linearGradient(listOf(DarkSurfaceVariant, DarkSurfaceVariant))
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.Bolt,
-                    contentDescription = null,
-                    tint = if (state.isGameBoosted) Color.White else TextTertiary,
-                    modifier = Modifier.size(28.dp)
-                )
-            }
-            Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    "Game Boost",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = if (state.isGameBoosted) NeonGreen else TextPrimary
-                )
-                Text(
-                    if (state.isGameBoosted) "Performance mode active" else "Maximize gaming performance",
+                    "Detected: ${state.rootType} · ${state.autoDetectedMode.lowercase().replace('_', ' ')}",
                     style = MaterialTheme.typography.bodySmall,
                     color = TextTertiary
                 )
             }
-            if (state.isBoosting) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(24.dp),
-                    color = NeonGreen,
-                    strokeWidth = 2.dp
-                )
-            } else {
-                Switch(
-                    checked = state.isGameBoosted,
-                    onCheckedChange = { if (!state.isBoosting) onToggle() },
-                    colors = SwitchDefaults.colors(
-                        checkedThumbColor = Color.White,
-                        checkedTrackColor = NeonGreen,
-                        uncheckedThumbColor = TextTertiary,
-                        uncheckedTrackColor = DarkSurfaceVariant
-                    )
-                )
+            Button(
+                onClick = onAutoActivate,
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = NeonCyan,
+                    contentColor = DarkBackground
+                ),
+                contentPadding = PaddingValues(horizontal = 20.dp, vertical = 10.dp)
+            ) {
+                Icon(Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(6.dp))
+                Text("Activate", fontWeight = FontWeight.Bold)
             }
         }
     }
 }
 
 @Composable
-private fun QuickToolsRow(onNavigateToShell: () -> Unit) {
+private fun QuickActionsRow(
+    state: beta.manager.ui.viewmodel.HomeUiState,
+    viewModel: HomeViewModel,
+    onNavigateToShell: () -> Unit,
+    onInstallPlugin: (() -> Unit)?
+) {
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        ToolCard(
-            title = "Shell",
-            subtitle = "Run commands",
+        ActionChip(
+            icon = Icons.Filled.Add,
+            label = "Install",
+            color = NeonCyan,
+            onClick = { onInstallPlugin?.invoke() },
+            modifier = Modifier.weight(1f)
+        )
+        ActionChip(
+            icon = Icons.Filled. CleaningServices,
+            label = if (state.isCleaning) "..." else "Clean",
+            color = NeonOrange,
+            onClick = { viewModel.cleanAll() },
+            modifier = Modifier.weight(1f)
+        )
+        ActionChip(
             icon = Icons.Filled.Terminal,
+            label = "Shell",
             color = NeonGreen,
             onClick = onNavigateToShell,
+            modifier = Modifier.weight(1f)
+        )
+        ActionChip(
+            icon = if (state.isGameBoosted) Icons.Filled.Bolt else Icons.Filled.Speed,
+            label = if (state.isGameBoosted) "Boost ON" else "Boost",
+            color = if (state.isGameBoosted) NeonGreen else NeonPink,
+            onClick = { viewModel.toggleGameBoost() },
             modifier = Modifier.weight(1f)
         )
     }
 }
 
 @Composable
-private fun ToolCard(
-    title: String,
-    subtitle: String,
+private fun ActionChip(
     icon: ImageVector,
-    color: androidx.compose.ui.graphics.Color,
+    label: String,
+    color: Color,
     onClick: () -> Unit,
     modifier: Modifier
 ) {
     Card(
         onClick = onClick,
-        modifier = modifier.height(96.dp),
-        shape = RoundedCornerShape(16.dp),
+        modifier = modifier.height(72.dp),
+        shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = DarkCard),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(22.dp))
+            Spacer(Modifier.height(4.dp))
+            Text(label, style = MaterialTheme.typography.labelSmall, color = TextSecondary, fontSize = 10.sp)
+        }
+    }
+}
+
+@Composable
+private fun ModuleCard(
+    plugin: PluginInfo,
+    onToggle: () -> Unit,
+    onRemove: () -> Unit
+) {
+    val sourceColor = when (plugin.source) {
+        PluginSource.BETA -> NeonCyan
+        PluginSource.AXMANAGER -> NeonOrange
+        PluginSource.MAGISK -> NeonGreen
+        PluginSource.KSU -> NeonPurple
+    }
+    val sourceLabel = when (plugin.source) {
+        PluginSource.BETA -> "BETA"
+        PluginSource.AXMANAGER -> "AXRON"
+        PluginSource.MAGISK -> "MAGISK"
+        PluginSource.KSU -> "KSU"
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (plugin.isEnabled) DarkCard else DarkSurfaceVariant
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = if (plugin.isEnabled) 1.dp else 0.dp)
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(42.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(
+                            if (plugin.isEnabled)
+                                Brush.linearGradient(listOf(sourceColor, sourceColor.copy(alpha = 0.4f)))
+                            else
+                                Brush.linearGradient(listOf(DarkSurfaceVariant, DarkSurfaceVariant))
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Filled.Extension,
+                        contentDescription = null,
+                        tint = if (plugin.isEnabled) Color.White else TextTertiary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(
+                            plugin.name,
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = if (plugin.isEnabled) TextPrimary else TextTertiary,
+                            maxLines = 1
+                        )
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(sourceColor.copy(alpha = 0.2f))
+                                .padding(horizontal = 5.dp, vertical = 1.dp)
+                        ) {
+                            Text(
+                                sourceLabel,
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = sourceColor
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(1.dp))
+                    Text(
+                        "${plugin.version} · ${plugin.author.ifEmpty { "Unknown" }}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextTertiary,
+                        fontSize = 11.sp
+                    )
+                }
+                Switch(
+                    checked = plugin.isEnabled,
+                    onCheckedChange = { onToggle() },
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = Color.White,
+                        checkedTrackColor = sourceColor,
+                        uncheckedThumbColor = TextTertiary,
+                        uncheckedTrackColor = DarkSurfaceVariant
+                    ),
+                    modifier = Modifier.height(24.dp)
+                )
+            }
+            if (plugin.description.isNotBlank()) {
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    plugin.description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextSecondary,
+                    maxLines = 2,
+                    fontSize = 12.sp
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun EmptyModulesCard() {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = DarkSurface)
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Box(
                 modifier = Modifier
-                    .size(44.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(color.copy(alpha = 0.15f)),
+                    .size(56.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(
+                        Brush.linearGradient(listOf(NeonCyan.copy(alpha = 0.15f), NeonPurple.copy(alpha = 0.15f)))
+                    ),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector = icon,
+                    Icons.Filled.Extension,
                     contentDescription = null,
-                    tint = color,
-                    modifier = Modifier.size(24.dp)
+                    tint = NeonCyan.copy(alpha = 0.5f),
+                    modifier = Modifier.size(28.dp)
                 )
             }
-            Column {
-                Text(
-                    title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = TextPrimary
-                )
-                Text(
-                    subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = TextTertiary
-                )
-            }
+            Spacer(Modifier.height(12.dp))
+            Text("No modules found", style = MaterialTheme.typography.titleMedium, color = TextSecondary)
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "Install a plugin ZIP or module to get started",
+                style = MaterialTheme.typography.bodySmall,
+                color = TextTertiary,
+                textAlign = TextAlign.Center
+            )
         }
     }
 }
@@ -440,25 +487,16 @@ private fun ToolCard(
 private fun ActivationLogCard(log: String) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = DarkSurface)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = Icons.Filled.Info,
-                    contentDescription = null,
-                    tint = TextTertiary,
-                    modifier = Modifier.size(16.dp)
-                )
+                Icon(Icons.Filled.Info, contentDescription = null, tint = TextTertiary, modifier = Modifier.size(14.dp))
                 Spacer(Modifier.width(6.dp))
-                Text(
-                    "Activity Log",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = TextTertiary
-                )
+                Text("Activity Log", style = MaterialTheme.typography.labelMedium, color = TextTertiary)
             }
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(6.dp))
             Text(
                 log,
                 style = MaterialTheme.typography.bodySmall,

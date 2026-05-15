@@ -19,7 +19,10 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
     init {
         viewModelScope.launch {
-            prefs.settingsFlow.collect { _settings.value = it }
+            prefs.settingsFlow.collect { s ->
+                _settings.value = s
+                Shell.setDebugMode(s.advDebug)
+            }
         }
     }
 
@@ -80,6 +83,34 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             prefs.setBusyboxMode(enabled)
             if (enabled) {
                 Shell.execute("export ASH_STANDALONE=1; \$(pgrep -f busybox | head -1) 2>/dev/null")
+            }
+        }
+    }
+
+    fun setShizukuMode(enabled: Boolean) {
+        viewModelScope.launch { prefs.setShizukuMode(enabled) }
+    }
+
+    fun setMagiskModuleMode(enabled: Boolean) {
+        viewModelScope.launch { prefs.setMagiskModuleMode(enabled) }
+    }
+
+    fun setKsuModuleMode(enabled: Boolean) {
+        viewModelScope.launch { prefs.setKsuModuleMode(enabled) }
+    }
+
+    fun setFlashModule(enabled: Boolean) {
+        viewModelScope.launch { prefs.setFlashModule(enabled) }
+    }
+
+    fun setAdvDebug(enabled: Boolean) {
+        viewModelScope.launch {
+            prefs.setAdvDebug(enabled)
+            Shell.setDebugMode(enabled)
+            if (enabled) {
+                Shell.execute("setprop debug.beta.manager 1 2>/dev/null")
+            } else {
+                Shell.execute("setprop debug.beta.manager 0 2>/dev/null")
             }
         }
     }

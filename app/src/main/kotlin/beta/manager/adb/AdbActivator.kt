@@ -1,7 +1,9 @@
 package beta.manager.adb
 
 import android.content.Context
+import beta.manager.utils.RootType
 import beta.manager.utils.Shell
+import beta.manager.utils.ShizukuShell
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -9,7 +11,8 @@ enum class ActivationMode {
     WIRELESS_DEBUG,
     ADB_USB,
     TCP_MODE,
-    ROOT_SU
+    ROOT_SU,
+    SHIZUKU
 }
 
 data class ActivationResult(
@@ -32,6 +35,7 @@ class AdbActivator(private val context: Context) {
             ActivationMode.ADB_USB -> activateAdbUsb()
             ActivationMode.TCP_MODE -> activateTcp()
             ActivationMode.ROOT_SU -> activateRoot()
+            ActivationMode.SHIZUKU -> activateShizuku()
         }
     }
 
@@ -114,7 +118,8 @@ class AdbActivator(private val context: Context) {
                 is Shell.Result.Success -> {
                     val running = retryConnect(3, 500)
                     if (running) {
-                        return ActivationResult(true, ActivationMode.ROOT_SU, "Service started with root privileges")
+                        val rootType = Shell.detectRootType()
+                        return ActivationResult(true, ActivationMode.ROOT_SU, "Service started with ${rootType.name} root")
                     }
                 }
                 is Shell.Result.Error -> {
@@ -127,6 +132,48 @@ class AdbActivator(private val context: Context) {
         }
     }
 
+    private suspend fun activateShizuku(): ActivationResult {
+        try {
+            if (!ShizukuShell.isAvailable()) {
+                return ActivationResult(false, ActivationMode.SHIZUKU,
+                    "Shizuku not running.\n\n" +
+                    "1. Install Shizuku from GitHub\n" +
+                    "2. Open Shizuku app\n" +
+                    "3. Start Shizuku service\n" +
+                    "4. Grant Beta Manager permission"
+                )
+            }
+
+            val uid = ShizukuShell.getVersion()
+            val isElevated = ShizukuShell.isShellUid() || ShizukuShell.isRootUid()
+
+            val cmd = listOf(
+                "export CLASSPATH=$(pm path beta.manager | grep base)",
+                "app_process /system/bin beta.manager.service.BetaService &"
+            ).joinToString(" && ")
+
+            when (Shell.execute(cmd)) {
+                is Shell.Result.Success -> {
+                    val running = retryConnect(3, 500)
+                    if (running) {
+                        val mode = if (isElevated) "elevated" else "standard"
+                        return ActivationResult(true, ActivationMode.SHIZUKU, "Service started via Shizuku ($mode)")
+                    }
+                }
+                is Shell.Result.Error -> {
+                    val running = client.startService()
+                    if (running) {
+                        return ActivationResult(true, ActivationMode.SHIZUKU, "Service started via Shizuku")
+                    }
+                    return ActivationResult(false, ActivationMode.SHIZUKU, "Shizuku execution failed. Try ADB or Root mode.")
+                }
+            }
+            return ActivationResult(false, ActivationMode.SHIZUKU, "Shizuku activation failed")
+        } catch (e: Exception) {
+            return ActivationResult(false, ActivationMode.SHIZUKU, "Error: ${e.message}")
+        }
+    }
+
     private suspend fun retryConnect(retries: Int, delayMs: Long): Boolean {
         for (i in 0 until retries) {
             if (client.isServiceRunning()) return true
@@ -135,12 +182,27 @@ class AdbActivator(private val context: Context) {
         return client.isServiceRunning()
     }
 
+    suspend fun autoDetectMode(): ActivationMode {
+        return when {
+            Shell.isRootAvailable() -> ActivationMode.ROOT_SU
+            ShizukuShell.isAvailable() -> ActivationMode.SHIZUKU
+            Shell.isAdbShell() -> ActivationMode.ADB_USB
+            else -> ActivationMode.WIRELESS_DEBUG
+        }
+    }
+
+    suspend fun autoActivate(): ActivationResult {
+        val mode = autoDetectMode()
+        return activate(mode)
+    }
+
     suspend fun checkAllModes(): Map<ActivationMode, Boolean> = withContext(Dispatchers.IO) {
         mapOf(
             ActivationMode.ROOT_SU to Shell.isRootAvailable(),
             ActivationMode.ADB_USB to Shell.isAdbShell(),
             ActivationMode.WIRELESS_DEBUG to false,
-            ActivationMode.TCP_MODE to false
+            ActivationMode.TCP_MODE to false,
+            ActivationMode.SHIZUKU to ShizukuShell.isAvailable()
         )
     }
 }

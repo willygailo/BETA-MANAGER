@@ -14,4 +14,11 @@ interface IBetaService {
     String getServerPath();
     int getApiLevel();
     String getArchitecture();
+    String fixUpdateAll();
+    String flashModule(String zipPath);
+    String getRootType();
+    String getDebugInfo();
+    int getPluginCount();
+    int getEnabledCount();
+    String getModulePath();
 }

@@ -153,7 +153,8 @@ fun BetaManagerNav() {
             composable(NavRoutes.Home.route) {
                 HomeScreen(
                     viewModel = homeViewModel,
-                    onNavigateToShell = { navController.navigate(NavRoutes.ShellExecutor.route) }
+                    onNavigateToShell = { navController.navigate(NavRoutes.ShellExecutor.route) },
+                    onInstallPlugin = { filePickerLauncher.launch("application/zip") }
                 )
             }
 

@@ -4,6 +4,8 @@ import beta.manager.utils.Shell
 import kotlinx.coroutines.runBlocking
 import java.io.File
 
+enum class PluginSource { BETA, AXMANAGER, MAGISK, KSU }
+
 data class PluginInfo(
     val id: String,
     val name: String,
@@ -14,7 +16,17 @@ data class PluginInfo(
     val isEnabled: Boolean = true,
     val hasAction: Boolean = false,
     val hasWebUI: Boolean = false,
-    val installedAt: Long = System.currentTimeMillis()
+    val installedAt: Long = System.currentTimeMillis(),
+    val source: PluginSource = PluginSource.BETA
+)
+
+data class UpdateInfo(
+    val id: String,
+    val name: String,
+    val currentVersion: String,
+    val currentVersionCode: Int,
+    val newVersionCode: Int,
+    val needsUpdate: Boolean
 )
 
 class PluginManager(private val pluginsDir: String) {
@@ -22,52 +34,72 @@ class PluginManager(private val pluginsDir: String) {
     companion object {
         const val SERVER_VERSION = 10001
         private val AXMANAGER_PLUGINS_DIR = "/data/user_de/0/com.android.shell/axeron/plugins/"
+        private val MAGISK_MODULES_DIR = "/data/adb/modules/"
+        private val KSU_MODULES_DIR = "/data/adb/ksu/modules/"
     }
 
     private val plugins = mutableMapOf<String, PluginInfo>()
 
     fun scanPlugins(): List<PluginInfo> {
         plugins.clear()
-        scanSingleDir(pluginsDir)
-        scanSingleDir(AXMANAGER_PLUGINS_DIR)
+        scanSingleDir(pluginsDir, PluginSource.BETA)
+        scanSingleDir(AXMANAGER_PLUGINS_DIR, PluginSource.AXMANAGER)
+        scanModulesDir(MAGISK_MODULES_DIR, PluginSource.MAGISK)
+        scanModulesDir(KSU_MODULES_DIR, PluginSource.KSU)
         return plugins.values.toList()
     }
 
-    private fun scanSingleDir(dirPath: String) {
+    private fun scanSingleDir(dirPath: String, source: PluginSource) {
         val dir = File(dirPath)
         if (!dir.exists()) return
+        dir.listFiles()?.forEach { pluginDir ->
+            if (pluginDir.isDirectory) scanPluginDir(pluginDir, source)
+        }
+    }
 
+    private fun scanModulesDir(dirPath: String, source: PluginSource) {
+        val dir = File(dirPath)
+        if (!dir.exists()) return
         dir.listFiles()?.forEach { pluginDir ->
             if (pluginDir.isDirectory) {
                 val propFile = File(pluginDir, "module.prop")
-                if (propFile.exists()) {
-                    val props = parseModuleProp(propFile)
-                    val id = props["id"] ?: pluginDir.name
-                    if (plugins.containsKey(id)) return@forEach
-
-                    val isDisabled = File(pluginDir, "disable").exists()
-                    val isMarkedRemove = File(pluginDir, "remove").exists()
-
-                    if (isMarkedRemove) {
-                        runBlocking { cleanupPlugin(pluginDir) }
-                        return@forEach
-                    }
-
-                    plugins[id] = PluginInfo(
-                        id = id,
-                        name = props["name"] ?: id,
-                        version = props["version"] ?: "v1.0",
-                        versionCode = props["versionCode"]?.toIntOrNull() ?: 1,
-                        author = props["author"] ?: "",
-                        description = props["description"] ?: "",
-                        isEnabled = !isDisabled,
-                        hasAction = File(pluginDir, "action.sh").exists(),
-                        hasWebUI = File(pluginDir, "webroot/index.html").exists(),
-                        installedAt = pluginDir.lastModified()
-                    )
-                }
+                if (!propFile.exists()) return@forEach
+                val props = parseModuleProp(propFile)
+                val id = props["id"] ?: pluginDir.name
+                if (plugins.containsKey(id)) return@forEach
+                plugins[id] = buildPluginInfo(pluginDir, props, id, source)
             }
         }
+    }
+
+    private fun scanPluginDir(pluginDir: File, source: PluginSource) {
+        val propFile = File(pluginDir, "module.prop")
+        if (!propFile.exists()) return
+        val props = parseModuleProp(propFile)
+        val id = props["id"] ?: pluginDir.name
+        if (plugins.containsKey(id)) return
+        if (File(pluginDir, "remove").exists()) {
+            runBlocking { cleanupPlugin(pluginDir) }
+            return
+        }
+        plugins[id] = buildPluginInfo(pluginDir, props, id, source)
+    }
+
+    private fun buildPluginInfo(dir: File, props: Map<String, String>, id: String, source: PluginSource): PluginInfo {
+        val isDisabled = File(dir, "disable").exists()
+        return PluginInfo(
+            id = id,
+            name = props["name"] ?: id,
+            version = props["version"] ?: "v1.0",
+            versionCode = props["versionCode"]?.toIntOrNull() ?: 1,
+            author = props["author"] ?: "",
+            description = props["description"] ?: "",
+            isEnabled = !isDisabled,
+            hasAction = File(dir, "action.sh").exists(),
+            hasWebUI = File(dir, "webroot/index.html").exists(),
+            installedAt = dir.lastModified(),
+            source = source
+        )
     }
 
     fun getPlugin(id: String): PluginInfo? = plugins[id]
@@ -88,9 +120,24 @@ class PluginManager(private val pluginsDir: String) {
         return plugins.values.map { it.id }
     }
 
+    fun cleanAllMarked(): Int {
+        var cleaned = 0
+        val dirs = listOf(pluginsDir, AXMANAGER_PLUGINS_DIR, MAGISK_MODULES_DIR, KSU_MODULES_DIR)
+        for (dirPath in dirs) {
+            val dir = File(dirPath)
+            if (!dir.exists()) continue
+            dir.listFiles()?.forEach { pluginDir ->
+                if (pluginDir.isDirectory && File(pluginDir, "remove").exists()) {
+                    runBlocking { cleanupPlugin(pluginDir) }
+                    cleaned++
+                }
+            }
+        }
+        return cleaned
+    }
+
     fun disable(id: String): Boolean {
-        val pluginDir = File(pluginsDir, id)
-        if (!pluginDir.exists()) return false
+        val pluginDir = findPluginDir(id) ?: return false
         return try {
             File(pluginDir, "disable").createNewFile()
             val current = plugins[id] ?: return false
@@ -102,8 +149,7 @@ class PluginManager(private val pluginsDir: String) {
     }
 
     fun enable(id: String): Boolean {
-        val pluginDir = File(pluginsDir, id)
-        if (!pluginDir.exists()) return false
+        val pluginDir = findPluginDir(id) ?: return false
         return try {
             File(pluginDir, "disable").delete()
             val current = plugins[id] ?: return false
@@ -115,8 +161,7 @@ class PluginManager(private val pluginsDir: String) {
     }
 
     fun markForRemoval(id: String): Boolean {
-        val pluginDir = File(pluginsDir, id)
-        if (!pluginDir.exists()) return false
+        val pluginDir = findPluginDir(id) ?: return false
         return try {
             File(pluginDir, "remove").createNewFile()
             plugins.remove(id)
@@ -126,9 +171,20 @@ class PluginManager(private val pluginsDir: String) {
         }
     }
 
+    private fun findPluginDir(id: String): File? {
+        val candidates = listOf(
+            File(pluginsDir, id),
+            File(AXMANAGER_PLUGINS_DIR, id),
+            File(MAGISK_MODULES_DIR, id),
+            File(KSU_MODULES_DIR, id)
+        )
+        return candidates.firstOrNull { it.exists() }
+    }
+
     suspend fun runAction(id: String): Boolean {
         val plugin = plugins[id] ?: return false
-        val actionScript = File(pluginsDir, "$id/action.sh")
+        val pluginDir = findPluginDir(id) ?: return false
+        val actionScript = File(pluginDir, "action.sh")
         if (!actionScript.exists()) return false
         val modDir = actionScript.parentFile?.absolutePath ?: return false
 
@@ -150,7 +206,7 @@ class PluginManager(private val pluginsDir: String) {
 
     suspend fun runBootScripts() {
         for (plugin in plugins.values.filter { it.isEnabled }) {
-            val dir = File(pluginsDir, plugin.id)
+            val dir = findPluginDir(plugin.id) ?: continue
             val postFsData = File(dir, "post-fs-data.sh")
             val serviceSh = File(dir, "service.sh")
 

@@ -71,6 +71,13 @@ fun SettingsScreen(
 
             item {
                 Spacer(Modifier.height(8.dp))
+                SettingsHeader("Root & Privilege")
+            }
+            item { SettingsToggleCard("Shizuku Mode", "Use Shizuku for elevated shell access", settings.shizukuMode, Icons.Outlined.Security, NeonCyan) { viewModel.setShizukuMode(it) } }
+            item { SettingsToggleCard("Flash as Magisk Module", "Install plugins as Magisk/KSU modules", settings.flashModule, Icons.Outlined.Extension, NeonOrange) { viewModel.setFlashModule(it) } }
+
+            item {
+                Spacer(Modifier.height(8.dp))
                 SettingsHeader("Performance")
             }
             item { SettingsToggleCard("Thermal Control", "Manage thermal throttling", settings.thermalControl, Icons.Outlined.Thermostat, NeonOrange) { viewModel.setThermalControl(it) } }
@@ -79,9 +86,10 @@ fun SettingsScreen(
 
             item {
                 Spacer(Modifier.height(8.dp))
-                SettingsHeader("Debug")
+                SettingsHeader("Debug & Advanced")
             }
             item { SettingsToggleCard("Debug Mode", "Show debug logs and shell access", settings.debugMode, Icons.Outlined.BugReport, NeonYellow) { viewModel.setDebugMode(it) } }
+            item { SettingsToggleCard("Advanced Debug (SU)", "Verbose root shell logging and debug props", settings.advDebug, Icons.Outlined.Adb, NeonRed) { viewModel.setAdvDebug(it) } }
             item { SettingsToggleCard("BusyBox Mode", "Use BusyBox standalone mode", settings.busyboxMode, Icons.Outlined.Terminal, NeonGreen) { viewModel.setBusyboxMode(it) } }
 
             item { Spacer(Modifier.height(16.dp)) }
@@ -200,7 +208,7 @@ private fun AboutCard() {
                 color = TextPrimary
             )
             Text(
-                "v1.0.0",
+                "v1.1.0",
                 style = MaterialTheme.typography.bodyMedium,
                 color = NeonCyan
             )

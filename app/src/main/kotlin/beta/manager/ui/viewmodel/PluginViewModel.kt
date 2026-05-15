@@ -17,7 +17,9 @@ data class PluginUiState(
     val error: String? = null,
     val isInstalling: Boolean = false,
     val installResult: String? = null,
-    val actionOutput: String? = null
+    val actionOutput: String? = null,
+    val isFixing: Boolean = false,
+    val fixResult: String? = null
 )
 
 class PluginViewModel : ViewModel() {
@@ -105,11 +107,56 @@ class PluginViewModel : ViewModel() {
         }
     }
 
+    fun fixUpdateAll() {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isFixing = true, fixResult = null)
+            try {
+                val plugins = pluginManager.scanPlugins()
+                val fixed = pluginInstaller.fixAllPlugins(plugins)
+                val updates = pluginInstaller.checkForUpdates(plugins)
+                val pending = updates.count { it.needsUpdate }
+                _uiState.value = _uiState.value.copy(
+                    isFixing = false,
+                    fixResult = "Fixed $fixed plugins, $pending updates available"
+                )
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    isFixing = false,
+                    fixResult = "Fix failed: ${e.message}"
+                )
+            }
+            loadPlugins()
+        }
+    }
+
+    fun flashToMagisk(zipPath: String) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isInstalling = true, installResult = null)
+            try {
+                val result = pluginInstaller.installToMagisk(zipPath)
+                _uiState.value = _uiState.value.copy(
+                    isInstalling = false,
+                    installResult = result.message
+                )
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    isInstalling = false,
+                    installResult = "Error: ${e.message}"
+                )
+            }
+            loadPlugins()
+        }
+    }
+
     fun clearInstallResult() {
         _uiState.value = _uiState.value.copy(installResult = null)
     }
 
     fun clearActionOutput() {
         _uiState.value = _uiState.value.copy(actionOutput = null)
+    }
+
+    fun clearFixResult() {
+        _uiState.value = _uiState.value.copy(fixResult = null)
     }
 }

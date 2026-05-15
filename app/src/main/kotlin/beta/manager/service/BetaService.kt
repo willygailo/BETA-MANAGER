@@ -7,22 +7,21 @@ import android.app.Service
 import android.content.Intent
 import android.os.Build
 import android.os.IBinder
-import android.os.Process
 import beta.manager.IBetaService
 import beta.manager.plugin.PluginInstaller
 import beta.manager.plugin.PluginManager
-import beta.manager.plugin.PluginManager.Companion.SERVER_VERSION
 import beta.manager.utils.Shell
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import java.io.File
 
 class BetaService : Service() {
 
     companion object {
         const val TAG = "BetaService"
-        const val SERVER_VERSION = 10001
+        const val SERVER_VERSION = 10002
         const val NOTIFICATION_ID = 1001
         const val CHANNEL_ID = "beta_service_channel"
 
@@ -107,6 +106,113 @@ class BetaService : Service() {
             val abis = Build.SUPPORTED_ABIS
             return if (abis.isNotEmpty()) abis[0] else "unknown"
         }
+
+        override fun fixUpdateAll(): String {
+            val sb = StringBuilder()
+            val job = serviceScope.launch {
+                try {
+                    val plugins = pluginManager.scanPlugins()
+                    sb.appendLine("Found ${plugins.size} plugins")
+
+                    var fixed = 0
+                    var updated = 0
+
+                    for (plugin in plugins) {
+                        if (pluginInstaller.fixPlugin(plugin.id)) {
+                            fixed++
+                            sb.appendLine("Fixed: ${plugin.name}")
+                        }
+                    }
+
+                    val updates = pluginInstaller.checkForUpdates(plugins)
+                    for (update in updates) {
+                        if (update.needsUpdate) {
+                            sb.appendLine("Update available: ${update.name} (${update.currentVersionCode} -> ${update.newVersionCode})")
+                            updated++
+                        }
+                    }
+
+                    sb.appendLine("Fixed $fixed plugins, $updated updates available")
+                } catch (e: Exception) {
+                    sb.appendLine("Error: ${e.message}")
+                }
+            }
+            try {
+                kotlinx.coroutines.runBlocking { job.join() }
+            } catch (e: Exception) {
+                sb.appendLine("Error: ${e.message}")
+            }
+            return sb.toString().trim()
+        }
+
+        override fun flashModule(zipPath: String): String {
+            val sb = StringBuilder()
+            val job = serviceScope.launch {
+                try {
+                    val file = File(zipPath)
+                    if (!file.exists()) {
+                        sb.appendLine("ERROR: ZIP not found: $zipPath")
+                        return@launch
+                    }
+
+                    val result = pluginInstaller.installToMagisk(zipPath)
+                    if (result.success) {
+                        sb.appendLine("SUCCESS: ${result.message}")
+                        sb.appendLine("Module ID: ${result.pluginId}")
+                        sb.appendLine("Reboot to apply module")
+                    } else {
+                        val ksuResult = pluginInstaller.installToKSU(zipPath)
+                        if (ksuResult.success) {
+                            sb.appendLine("SUCCESS (KSU): ${ksuResult.message}")
+                        } else {
+                            sb.appendLine("FAILED: ${result.message}")
+                        }
+                    }
+                } catch (e: Exception) {
+                    sb.appendLine("ERROR: ${e.message}")
+                }
+            }
+            try {
+                kotlinx.coroutines.runBlocking { job.join() }
+            } catch (e: Exception) {
+                sb.appendLine("ERROR: ${e.message}")
+            }
+            return sb.toString().trim()
+        }
+
+        override fun getRootType(): String {
+            var result = "unknown"
+            val job = serviceScope.launch {
+                result = Shell.detectRootType().name
+            }
+            try {
+                kotlinx.coroutines.runBlocking { job.join() }
+            } catch (_: Exception) {}
+            return result
+        }
+
+        override fun getDebugInfo(): String {
+            var result = ""
+            val job = serviceScope.launch {
+                result = Shell.getDebugInfo()
+            }
+            try {
+                kotlinx.coroutines.runBlocking { job.join() }
+            } catch (e: Exception) {
+                result = "Error: ${e.message}"
+            }
+            return result
+        }
+
+        override fun getPluginCount(): Int {
+            return pluginManager.listPlugins().size
+        }
+
+        override fun getEnabledCount(): Int {
+            return pluginManager.scanPlugins().count { it.isEnabled }
+        }
+
+        override fun getModulePath(): String = PLUGINS_DIR
     }
 
     override fun onBind(intent: Intent?): IBinder = binder

@@ -23,6 +23,11 @@ class PreferencesManager(private val context: Context) {
         private val KEY_DEBUG_MODE = booleanPreferencesKey("debug_mode")
         private val KEY_BUSYBOX_MODE = booleanPreferencesKey("busybox_mode")
         private val KEY_GAME_BOOST_ACTIVE = booleanPreferencesKey("game_boost_active")
+        private val KEY_SHIZUKU_MODE = booleanPreferencesKey("shizuku_mode")
+        private val KEY_MAGISK_MODULE_MODE = booleanPreferencesKey("magisk_module_mode")
+        private val KEY_KSU_MODULE_MODE = booleanPreferencesKey("ksu_module_mode")
+        private val KEY_FLASH_MODULE = booleanPreferencesKey("flash_module")
+        private val KEY_ADV_DEBUG = booleanPreferencesKey("adv_debug")
     }
 
     data class Settings(
@@ -34,7 +39,12 @@ class PreferencesManager(private val context: Context) {
         val gpuBoost: Boolean = false,
         val debugMode: Boolean = false,
         val busyboxMode: Boolean = false,
-        val gameBoostActive: Boolean = false
+        val gameBoostActive: Boolean = false,
+        val shizukuMode: Boolean = false,
+        val magiskModuleMode: Boolean = false,
+        val ksuModuleMode: Boolean = false,
+        val flashModule: Boolean = false,
+        val advDebug: Boolean = false
     )
 
     val settingsFlow: Flow<Settings> = context.dataStore.data.map { prefs ->
@@ -47,7 +57,12 @@ class PreferencesManager(private val context: Context) {
             gpuBoost = prefs[KEY_GPU_BOOST] ?: false,
             debugMode = prefs[KEY_DEBUG_MODE] ?: false,
             busyboxMode = prefs[KEY_BUSYBOX_MODE] ?: false,
-            gameBoostActive = prefs[KEY_GAME_BOOST_ACTIVE] ?: false
+            gameBoostActive = prefs[KEY_GAME_BOOST_ACTIVE] ?: false,
+            shizukuMode = prefs[KEY_SHIZUKU_MODE] ?: false,
+            magiskModuleMode = prefs[KEY_MAGISK_MODULE_MODE] ?: false,
+            ksuModuleMode = prefs[KEY_KSU_MODULE_MODE] ?: false,
+            flashModule = prefs[KEY_FLASH_MODULE] ?: false,
+            advDebug = prefs[KEY_ADV_DEBUG] ?: false
         )
     }
 
@@ -60,4 +75,9 @@ class PreferencesManager(private val context: Context) {
     suspend fun setDebugMode(enabled: Boolean) { context.dataStore.edit { it[KEY_DEBUG_MODE] = enabled } }
     suspend fun setBusyboxMode(enabled: Boolean) { context.dataStore.edit { it[KEY_BUSYBOX_MODE] = enabled } }
     suspend fun setGameBoostActive(enabled: Boolean) { context.dataStore.edit { it[KEY_GAME_BOOST_ACTIVE] = enabled } }
+    suspend fun setShizukuMode(enabled: Boolean) { context.dataStore.edit { it[KEY_SHIZUKU_MODE] = enabled } }
+    suspend fun setMagiskModuleMode(enabled: Boolean) { context.dataStore.edit { it[KEY_MAGISK_MODULE_MODE] = enabled } }
+    suspend fun setKsuModuleMode(enabled: Boolean) { context.dataStore.edit { it[KEY_KSU_MODULE_MODE] = enabled } }
+    suspend fun setFlashModule(enabled: Boolean) { context.dataStore.edit { it[KEY_FLASH_MODULE] = enabled } }
+    suspend fun setAdvDebug(enabled: Boolean) { context.dataStore.edit { it[KEY_ADV_DEBUG] = enabled } }
 }
