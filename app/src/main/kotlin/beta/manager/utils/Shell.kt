@@ -20,24 +20,31 @@ object Shell {
 
     fun setDebugMode(enabled: Boolean) { debugMode = enabled }
 
+    fun quote(value: String): String = "'${value.replace("'", "'\"'\"'")}'"
+
     suspend fun executeWithElevation(command: String, timeout: Long = 30000L): Result {
-        return if (isRootAvailable()) {
-            execute(command, timeout, useRoot = true)
-        } else {
-            ShizukuShell.execute(command, timeout)
+        if (isRootAvailable()) {
+            return execute(command, timeout, useRoot = true)
         }
+
+        if (ShizukuShell.isAvailable()) {
+            if (!ShizukuShell.hasPermission()) {
+                return Result.Error("Shizuku is running but permission is not granted")
+            }
+            return ShizukuShell.execute(command, timeout)
+        }
+
+        return Result.Error("No root or Shizuku permission available")
     }
 
     suspend fun execute(command: String, timeout: Long = 30000L, useRoot: Boolean = false): Result = withContext(Dispatchers.IO) {
         val startTime = System.currentTimeMillis()
         try {
-            val shellCmd = if (useRoot) {
-                "su -c '$command'"
+            val process = if (useRoot) {
+                ProcessBuilder("su", "-c", command).start()
             } else {
-                command
+                ProcessBuilder("sh", "-c", command).start()
             }
-            val runtime = Runtime.getRuntime()
-            val process = runtime.exec(arrayOf("sh", "-c", shellCmd))
 
             val stdout = StringBuilder()
             val stderr = StringBuilder()
@@ -96,12 +103,16 @@ object Shell {
 
     suspend fun isRootAvailable(): Boolean = withContext(Dispatchers.IO) {
         try {
-            val process = Runtime.getRuntime().exec(arrayOf("su", "-c", "echo root"))
+            val process = ProcessBuilder("su", "-c", "echo root").start()
             process.outputStream.close()
             val reader = BufferedReader(InputStreamReader(process.inputStream))
             val line = reader.readLine()
-            process.waitFor()
-            line == "root"
+            val finished = process.waitFor(3, java.util.concurrent.TimeUnit.SECONDS)
+            if (!finished) {
+                process.destroyForcibly()
+                return@withContext false
+            }
+            line == "root" && process.exitValue() == 0
         } catch (e: Exception) {
             false
         }
@@ -113,6 +124,7 @@ object Shell {
             checkKernelSU() -> RootType.KERNELSU
             checkAPatch() -> RootType.APATCH
             isRootAvailable() -> RootType.SU
+            ShizukuShell.hasPermission() -> RootType.SHIZUKU
             else -> RootType.NONE
         }
     }

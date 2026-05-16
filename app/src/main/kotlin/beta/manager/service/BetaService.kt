@@ -14,6 +14,7 @@ import beta.manager.utils.Shell
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import java.io.File
 
@@ -25,10 +26,14 @@ class BetaService : Service() {
         const val NOTIFICATION_ID = 1001
         const val CHANNEL_ID = "beta_service_channel"
 
-        private const val BASE_DIR = "/data/user_de/0/com.android.shell/beta/"
-        private const val PLUGINS_DIR = "${BASE_DIR}plugins/"
-        private const val BIN_DIR = "${BASE_DIR}bin/"
-        private const val LOGS_DIR = "${BASE_DIR}logs/"
+        const val BASE_DIR = "/data/user_de/0/com.android.shell/beta/"
+        const val PLUGINS_DIR = "${BASE_DIR}plugins/"
+        const val BIN_DIR = "${BASE_DIR}bin/"
+        const val LOGS_DIR = "${BASE_DIR}logs/"
+
+        @Volatile
+        var isStarted: Boolean = false
+            private set
     }
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -41,7 +46,7 @@ class BetaService : Service() {
         override fun executeCommand(command: String): String {
             var result = ""
             val job = serviceScope.launch {
-                when (val res = Shell.execute(command)) {
+                when (val res = Shell.executeWithElevation(command)) {
                     is Shell.Result.Success -> result = res.output
                     is Shell.Result.Error -> result = "ERROR: ${res.message}"
                 }
@@ -219,6 +224,7 @@ class BetaService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        isStarted = true
         createNotificationChannel()
         startForeground(NOTIFICATION_ID, createNotification())
         serviceScope.launch {
@@ -227,12 +233,16 @@ class BetaService : Service() {
     }
 
     private suspend fun initialize() {
-        Shell.execute("mkdir -p $PLUGINS_DIR $BIN_DIR $LOGS_DIR")
+        Shell.executeWithElevation(
+            "mkdir -p ${Shell.quote(PLUGINS_DIR)} ${Shell.quote(BIN_DIR)} ${Shell.quote(LOGS_DIR)}"
+        )
         pluginManager.scanPlugins()
     }
 
     override fun onDestroy() {
         super.onDestroy()
+        isStarted = false
+        serviceScope.cancel()
     }
 
     private fun createNotificationChannel() {

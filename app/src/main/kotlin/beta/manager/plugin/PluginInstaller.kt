@@ -56,7 +56,10 @@ class PluginInstaller(
             return InstallResult(false, "ZIP file not found: $zipPath")
         }
 
-        val tempDir = File(baseDir, ".tmp_install_${System.currentTimeMillis()}")
+        val tempRoot = File(baseDir).takeIf { it.exists() && it.canWrite() }
+            ?: zipFile.parentFile
+            ?: File(System.getProperty("java.io.tmpdir") ?: ".")
+        val tempDir = File(tempRoot, ".tmp_install_${System.currentTimeMillis()}")
         tempDir.mkdirs()
 
         try {
@@ -87,13 +90,36 @@ class PluginInstaller(
             }
 
             val targetDir = if (flashToMagisk && magiskTarget != null) {
-                "${magiskTarget}${pluginId}"
+                File(magiskTarget, pluginId).absolutePath
             } else {
-                "${pluginsDir}${pluginId}"
+                File(pluginsDir, pluginId).absolutePath
+            }
+
+            val removeResult = Shell.executeWithElevation("rm -rf ${Shell.quote(targetDir)}")
+            if (removeResult is Shell.Result.Error) {
+                return InstallResult(false, "Unable to clean target directory: ${removeResult.message}")
+            }
+
+            val mkdirResult = Shell.executeWithElevation("mkdir -p ${Shell.quote(targetDir)}")
+            if (mkdirResult is Shell.Result.Error) {
+                return InstallResult(false, "Unable to create target directory: ${mkdirResult.message}")
+            }
+
+            val copyResult = Shell.executeWithElevation(
+                "cp -rf ${Shell.quote(tempDir.absolutePath)}/. ${Shell.quote(targetDir)}/"
+            )
+            if (copyResult is Shell.Result.Error) {
+                return InstallResult(false, "Unable to copy module files: ${copyResult.message}")
+            }
+
+            val chmodResult = Shell.executeWithElevation("chmod -R 755 ${Shell.quote(targetDir)}")
+            if (chmodResult is Shell.Result.Error) {
+                return InstallResult(false, "Unable to set module permissions: ${chmodResult.message}")
             }
 
             val customizeSh = File(tempDir, "customize.sh")
             if (customizeSh.exists()) {
+                val installedCustomizeSh = File(targetDir, "customize.sh").absolutePath
                 val env: Map<String, String> = mapOf(
                     "BETA" to "true",
                     "BETAVER" to "${PluginManager.SERVER_VERSION}",
@@ -107,15 +133,16 @@ class PluginInstaller(
                     "BOOTMODE" to "true",
                     "SKIPUNZIP" to ""
                 )
-                val envStr = env.entries.joinToString(" ") { (k, v) -> "${k}=${v}" }
-                Shell.executeWithElevation("$envStr sh '${customizeSh.absolutePath}'")
+                val envStr = env.entries.joinToString(" ") { (k, v) -> "${k}=${Shell.quote(v)}" }
+                val customizeResult = Shell.executeWithElevation(
+                    "$envStr sh ${Shell.quote(installedCustomizeSh)}"
+                )
+                if (customizeResult is Shell.Result.Error) {
+                    return InstallResult(false, "customize.sh failed: ${customizeResult.message}")
+                }
             }
 
-            Shell.executeWithElevation("rm -rf '$targetDir'")
-            Shell.executeWithElevation("mkdir -p '$targetDir'")
-            Shell.executeWithElevation("cp -rf '${tempDir.absolutePath}'/. '$targetDir/'")
-            Shell.executeWithElevation("chmod -R 755 '$targetDir'")
-            Shell.executeWithElevation("rm -f '$targetDir/disable' 2>/dev/null")
+            Shell.executeWithElevation("rm -f ${Shell.quote("$targetDir/disable")} 2>/dev/null")
 
             val action = if (flashToMagisk) "Flashed to ${File(targetDir).parentFile?.name}" else "Installed"
             return InstallResult(true, "$action successfully: ${props["name"] ?: pluginId} (v${props["version"] ?: "1.0"})", pluginId)
@@ -154,12 +181,25 @@ class PluginInstaller(
 
     suspend fun fixPlugin(pluginId: String): Boolean {
         val pluginDir = File(pluginsDir, pluginId)
-        if (!pluginDir.exists()) return false
+        if (!pluginDir.exists() || !pluginDir.canRead()) {
+            val pluginPath = pluginDir.absolutePath
+            val exists = Shell.executeWithElevation(
+                "[ -f ${Shell.quote("$pluginPath/module.prop")} ] && echo ok",
+                timeout = 10000L
+            )
+            if (exists !is Shell.Result.Success || exists.output.trim() != "ok") return false
+
+            val result = Shell.executeWithElevation(
+                "rm -f ${Shell.quote("$pluginPath/disable")} ${Shell.quote("$pluginPath/remove")}; " +
+                    "find ${Shell.quote(pluginPath)} -type f -name '*.sh' -exec chmod 755 {} \\; 2>/dev/null; " +
+                    "[ -d ${Shell.quote("$pluginPath/webroot")} ] && chmod -R 755 ${Shell.quote("$pluginPath/webroot")} || true",
+                timeout = 15000L
+            )
+            return result is Shell.Result.Success
+        }
 
         val propFile = File(pluginDir, "module.prop")
         if (!propFile.exists()) return false
-
-        val updateProps = parseModuleProp(propFile)
 
         File(pluginDir, "disable").delete()
         File(pluginDir, "remove").delete()
@@ -186,11 +226,19 @@ class PluginInstaller(
     }
 
     private fun extractZip(zipFile: File, targetDir: File) {
+        val canonicalTarget = targetDir.canonicalFile
         ZipInputStream(FileInputStream(zipFile)).use { zis ->
             var entry: ZipEntry? = zis.nextEntry
             while (entry != null) {
-                if (!entry.isDirectory) {
-                    val outputFile = File(targetDir, entry.name)
+                val outputFile = File(targetDir, entry.name)
+                val canonicalOutput = outputFile.canonicalFile
+                if (!canonicalOutput.path.startsWith(canonicalTarget.path + File.separator)) {
+                    throw SecurityException("Blocked unsafe ZIP entry: ${entry.name}")
+                }
+
+                if (entry.isDirectory) {
+                    outputFile.mkdirs()
+                } else {
                     outputFile.parentFile?.mkdirs()
                     outputFile.outputStream().use { fos ->
                         zis.copyTo(fos)

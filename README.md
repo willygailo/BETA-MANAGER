@@ -524,7 +524,7 @@ adb push cpu_boost_v2.0.0.zip /sdcard/
 
 | Tool | Version |
 |------|---------|
-| ☕ **JDK** | 17+ |
+| ☕ **JDK** | 21 LTS |
 | 📱 **Android SDK** | 35+ |
 | 🐘 **Gradle** | 8.11.1 |
 

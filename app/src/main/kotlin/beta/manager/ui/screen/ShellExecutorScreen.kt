@@ -33,6 +33,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import beta.manager.IBetaService
 import beta.manager.ui.theme.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 data class CommandEntry(val command: String, val output: String, val isError: Boolean = false)
 
@@ -48,8 +51,9 @@ fun ShellExecutorScreen(
     var historyIndex by remember { mutableIntStateOf(-1) }
     var service by remember { mutableStateOf<IBetaService?>(null) }
     val listState = rememberLazyListState()
+    val coroutineScope = rememberCoroutineScope()
 
-    LaunchedEffect(Unit) {
+    DisposableEffect(Unit) {
         val intent = Intent(context, Class.forName("beta.manager.service.BetaService"))
         val conn = object : ServiceConnection {
             override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
@@ -58,6 +62,12 @@ fun ShellExecutorScreen(
             override fun onServiceDisconnected(name: ComponentName?) { service = null }
         }
         context.bindService(intent, conn, Context.BIND_AUTO_CREATE)
+        onDispose {
+            try {
+                context.unbindService(conn)
+            } catch (_: Exception) {
+            }
+        }
     }
 
     fun execute(cmd: String) {
@@ -68,11 +78,13 @@ fun ShellExecutorScreen(
         historyIndex = -1
         input = ""
 
-        entries = if (s != null) {
-            val result = s.executeCommand(cmd)
-            entries + CommandEntry("", result, result.startsWith("ERROR:"))
-        } else {
-            entries + CommandEntry("", "ERROR: Service not connected", true)
+        coroutineScope.launch {
+            val output = if (s != null) {
+                withContext(Dispatchers.IO) { s.executeCommand(cmd) }
+            } else {
+                "ERROR: Service not connected"
+            }
+            entries = entries + CommandEntry("", output, output.startsWith("ERROR:"))
         }
     }
 

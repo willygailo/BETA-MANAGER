@@ -1,6 +1,8 @@
 package beta.manager.ui.screen
 
+import android.annotation.SuppressLint
 import android.content.pm.PackageManager
+import android.os.Build
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -31,6 +33,7 @@ data class SuAppInfo(
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
+@SuppressLint("QueryPermissionsNeeded")
 @Composable
 fun SuperuserScreen(
     onNavigateBack: () -> Unit
@@ -59,7 +62,12 @@ fun SuperuserScreen(
                     val output = proc.inputStream.bufferedReader().readText()
                     proc.waitFor()
 
-                    val installedPackages = pm.getInstalledApplications(PackageManager.ApplicationInfoFlags.of(0))
+                    val installedPackages = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        pm.getInstalledApplications(PackageManager.ApplicationInfoFlags.of(0))
+                    } else {
+                        @Suppress("DEPRECATION")
+                        pm.getInstalledApplications(0)
+                    }
                     appList@ for (app in installedPackages) {
                         val name = pm.getApplicationLabel(app).toString()
                         suApps.add(SuAppInfo(app.packageName, name))

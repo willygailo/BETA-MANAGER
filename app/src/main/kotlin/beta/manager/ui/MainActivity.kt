@@ -1,12 +1,17 @@
 package beta.manager.ui
 
+import android.Manifest
+import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.compose.animation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
@@ -34,12 +39,15 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import beta.manager.navigation.NavRoutes
+import beta.manager.service.BetaService
 import beta.manager.ui.screen.*
 import beta.manager.ui.theme.*
 import beta.manager.ui.viewmodel.GameProfilesViewModel
 import beta.manager.ui.viewmodel.HomeViewModel
 import beta.manager.ui.viewmodel.PluginViewModel
 import beta.manager.ui.viewmodel.SettingsViewModel
+import beta.manager.utils.ShizukuShell
+import rikka.shizuku.Shizuku
 import java.io.File
 import java.io.FileOutputStream
 
@@ -51,13 +59,74 @@ data class BottomNavItem(
 )
 
 class MainActivity : ComponentActivity() {
+    private val notificationPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { }
+
+    private val shizukuPermissionListener =
+        Shizuku.OnRequestPermissionResultListener { requestCode, grantResult ->
+            if (requestCode == ShizukuShell.REQUEST_PERMISSION_CODE &&
+                grantResult == PackageManager.PERMISSION_GRANTED
+            ) {
+                startBetaService()
+            }
+        }
+
+    private val shizukuBinderReceivedListener = Shizuku.OnBinderReceivedListener {
+        requestShizukuPermissionIfNeeded()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        Shizuku.addRequestPermissionResultListener(shizukuPermissionListener)
+        Shizuku.addBinderReceivedListener(shizukuBinderReceivedListener)
+        requestNotificationPermissionIfNeeded()
+        startBetaService()
+        requestShizukuPermissionIfNeeded()
         setContent {
             BetaManagerTheme {
                 BetaManagerNav()
             }
+        }
+    }
+
+    override fun onDestroy() {
+        try {
+            Shizuku.removeRequestPermissionResultListener(shizukuPermissionListener)
+            Shizuku.removeBinderReceivedListener(shizukuBinderReceivedListener)
+        } catch (_: Exception) {
+        }
+        super.onDestroy()
+    }
+
+    private fun requestNotificationPermissionIfNeeded() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) ==
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            return
+        }
+        notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+    }
+
+    private fun requestShizukuPermissionIfNeeded() {
+        try {
+            if (!Shizuku.pingBinder() || Shizuku.isPreV11()) return
+            if (Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED) return
+            if (Shizuku.shouldShowRequestPermissionRationale()) return
+            Shizuku.requestPermission(ShizukuShell.REQUEST_PERMISSION_CODE)
+        } catch (_: Exception) {
+        }
+    }
+
+    private fun startBetaService() {
+        try {
+            ContextCompat.startForegroundService(
+                this,
+                Intent(this, BetaService::class.java)
+            )
+        } catch (_: Exception) {
         }
     }
 }
@@ -77,7 +146,8 @@ fun BetaManagerNav() {
         uri?.let { uri ->
             try {
                 val inputStream = context.contentResolver.openInputStream(uri) ?: return@rememberLauncherForActivityResult
-                val tempFile = File(context.cacheDir, "plugin_${System.currentTimeMillis()}.zip")
+                val cacheDir = context.externalCacheDir ?: context.cacheDir
+                val tempFile = File(cacheDir, "plugin_${System.currentTimeMillis()}.zip")
                 FileOutputStream(tempFile).use { output -> inputStream.copyTo(output) }
                 inputStream.close()
                 pluginViewModel.installZip(tempFile.absolutePath)

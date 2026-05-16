@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
 import android.os.IBinder
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import beta.manager.IBetaService
@@ -14,6 +15,7 @@ import beta.manager.adb.AdbActivator
 import beta.manager.adb.AdbClient
 import beta.manager.plugin.PluginInfo
 import beta.manager.plugin.PluginManager
+import beta.manager.service.BetaService
 import beta.manager.utils.PreferencesManager
 import beta.manager.utils.Shell
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -50,6 +52,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     private val prefs = PreferencesManager(application)
     private val pluginManager = PluginManager("/data/user_de/0/com.android.shell/beta/plugins/")
     private var betaService: IBetaService? = null
+    private var serviceBound = false
 
     private val connection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
@@ -63,6 +66,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     init {
+        bindService()
         checkModes()
         viewModelScope.launch {
             prefs.settingsFlow.collect { s ->
@@ -85,6 +89,30 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    private fun bindService() {
+        val app = getApplication<Application>()
+        val intent = Intent(app, BetaService::class.java)
+        try {
+            ContextCompat.startForegroundService(app, intent)
+            serviceBound = app.bindService(intent, connection, Context.BIND_AUTO_CREATE)
+        } catch (e: Exception) {
+            _uiState.value = _uiState.value.copy(
+                activationLog = "Service bind failed: ${e.message}"
+            )
+        }
+    }
+
+    override fun onCleared() {
+        if (serviceBound) {
+            try {
+                getApplication<Application>().unbindService(connection)
+            } catch (_: Exception) {
+            }
+            serviceBound = false
+        }
+        super.onCleared()
+    }
+
     private fun checkModes() {
         viewModelScope.launch {
             val modes = activator.checkAllModes()
@@ -102,10 +130,10 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     private fun checkService() {
         viewModelScope.launch {
             try {
-                val running = client.isServiceRunning()
+                val service = betaService
+                val running = service?.isRunning ?: client.isServiceRunning()
                 _uiState.value = _uiState.value.copy(isServiceRunning = running)
                 if (running) {
-                    val service = betaService
                     val plugins = service?.listPlugins()?.toList() ?: emptyList()
                     _uiState.value = _uiState.value.copy(
                         pluginCount = plugins.size,
@@ -166,7 +194,11 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun refreshStatus() { checkService(); scanModules() }
+    fun refreshStatus() {
+        if (!serviceBound) bindService()
+        checkService()
+        scanModules()
+    }
 
     fun cleanAll() {
         viewModelScope.launch {

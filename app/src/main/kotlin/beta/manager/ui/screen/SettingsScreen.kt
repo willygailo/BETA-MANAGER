@@ -208,7 +208,7 @@ private fun AboutCard() {
                 color = TextPrimary
             )
             Text(
-                "v1.1.0",
+                "v1.2.0",
                 style = MaterialTheme.typography.bodyMedium,
                 color = NeonCyan
             )

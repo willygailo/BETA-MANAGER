@@ -18,6 +18,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import beta.manager.ui.theme.*
+import beta.manager.utils.Shell
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -34,7 +35,7 @@ fun LogScreen(
         isLoading = true
         val lines = withContext(Dispatchers.IO) {
             val logDir = File("/data/user_de/0/com.android.shell/beta/logs/")
-            if (logDir.exists()) {
+            if (logDir.exists() && logDir.canRead()) {
                 logDir.listFiles()
                     ?.filter { it.name.endsWith(".log") }
                     ?.sortedByDescending { it.lastModified() }
@@ -42,7 +43,17 @@ fun LogScreen(
                         listOf("=== ${file.name} ===") + (file.readLines().ifEmpty { listOf("(empty)") })
                     } ?: listOf("No log files found")
             } else {
-                listOf("Log directory not found.\nService may not be running yet.")
+                when (val result = Shell.executeWithElevation(
+                    "for f in /data/user_de/0/com.android.shell/beta/logs/*.log; do [ -f \"\$f\" ] && echo \"=== \${f##*/} ===\" && cat \"\$f\"; done",
+                    timeout = 10000L
+                )) {
+                    is Shell.Result.Success -> result.output
+                        .lineSequence()
+                        .filter { it.isNotBlank() }
+                        .toList()
+                        .ifEmpty { listOf("No log files found") }
+                    is Shell.Result.Error -> listOf("Log directory not available: ${result.message}")
+                }
             }
         }
         logs = lines

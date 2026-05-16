@@ -1,7 +1,6 @@
 package beta.manager.adb
 
 import android.content.Context
-import beta.manager.utils.RootType
 import beta.manager.utils.Shell
 import beta.manager.utils.ShizukuShell
 import kotlinx.coroutines.Dispatchers
@@ -25,9 +24,23 @@ class AdbActivator(private val context: Context) {
 
     private val client = AdbClient(context)
 
+    private companion object {
+        const val RUNTIME_DIR = "/data/user_de/0/com.android.shell/beta"
+        const val PLUGINS_DIR = "$RUNTIME_DIR/plugins"
+        const val BIN_DIR = "$RUNTIME_DIR/bin"
+        const val LOGS_DIR = "$RUNTIME_DIR/logs"
+    }
+
     suspend fun activate(mode: ActivationMode): ActivationResult = withContext(Dispatchers.IO) {
         if (client.isServiceRunning()) {
-            return@withContext ActivationResult(true, mode, "Service already running")
+            val ready = when (mode) {
+                ActivationMode.ROOT_SU -> Shell.isRootAvailable()
+                ActivationMode.SHIZUKU -> ShizukuShell.isAvailable() && ShizukuShell.hasPermission()
+                else -> true
+            }
+            if (ready) {
+                return@withContext ActivationResult(true, mode, "Service already running")
+            }
         }
 
         when (mode) {
@@ -109,22 +122,24 @@ class AdbActivator(private val context: Context) {
                 return ActivationResult(false, ActivationMode.ROOT_SU, "Root not available on this device")
             }
 
-            val cmd = listOf(
-                "export CLASSPATH=\\\$(pm path beta.manager | grep base)",
-                "app_process /system/bin beta.manager.service.BetaService &"
-            ).joinToString(" && ")
+            if (!client.startService()) {
+                return ActivationResult(false, ActivationMode.ROOT_SU, "Unable to start local Beta service")
+            }
 
-            when (Shell.execute("su -c '$cmd'")) {
-                is Shell.Result.Success -> {
-                    val running = retryConnect(3, 500)
-                    if (running) {
-                        val rootType = Shell.detectRootType()
-                        return ActivationResult(true, ActivationMode.ROOT_SU, "Service started with ${rootType.name} root")
-                    }
-                }
-                is Shell.Result.Error -> {
-                    return ActivationResult(false, ActivationMode.ROOT_SU, "Root execution failed")
-                }
+            val mkdirCommand = "mkdir -p ${Shell.quote(PLUGINS_DIR)} ${Shell.quote(BIN_DIR)} ${Shell.quote(LOGS_DIR)}"
+            when (val result = Shell.executeWithElevation(mkdirCommand)) {
+                is Shell.Result.Success -> Unit
+                is Shell.Result.Error -> return ActivationResult(
+                    false,
+                    ActivationMode.ROOT_SU,
+                    "Root available, but runtime setup failed: ${result.message}"
+                )
+            }
+
+            val running = retryConnect(3, 500)
+            if (running) {
+                val rootType = Shell.detectRootType()
+                return ActivationResult(true, ActivationMode.ROOT_SU, "Service ready with ${rootType.name} root")
             }
             return ActivationResult(false, ActivationMode.ROOT_SU, "Root activation failed")
         } catch (e: Exception) {
@@ -144,23 +159,31 @@ class AdbActivator(private val context: Context) {
                 )
             }
 
-            val isElevated = ShizukuShell.isShellUid() || ShizukuShell.isRootUid()
-            val cmd = listOf(
-                "export CLASSPATH=\$(pm path beta.manager | grep base)",
-                "nohup app_process /system/bin beta.manager.service.BetaService > /dev/null 2>&1 &"
-            ).joinToString(" && ")
+            if (!ShizukuShell.hasPermission()) {
+                ShizukuShell.requestPermission()
+                return ActivationResult(false, ActivationMode.SHIZUKU,
+                    "Shizuku permission requested. Tap Allow, then activate again."
+                )
+            }
 
-            when (ShizukuShell.execute(cmd)) {
+            if (!client.startService()) {
+                return ActivationResult(false, ActivationMode.SHIZUKU, "Unable to start local Beta service")
+            }
+
+            val isElevated = ShizukuShell.isShellUid() || ShizukuShell.isRootUid()
+            val mkdirCommand = "mkdir -p ${Shell.quote(PLUGINS_DIR)} ${Shell.quote(BIN_DIR)} ${Shell.quote(LOGS_DIR)}"
+
+            when (val result = ShizukuShell.execute(mkdirCommand)) {
                 is Shell.Result.Success -> {
                     val running = retryConnectShizuku(5, 1000)
                     if (running) {
                         val level = if (isElevated) "elevated" else "standard"
-                        return ActivationResult(true, ActivationMode.SHIZUKU, "Service started via Shizuku ($level)")
+                        return ActivationResult(true, ActivationMode.SHIZUKU, "Service ready via Shizuku ($level)")
                     }
                 }
                 is Shell.Result.Error -> {
                     return ActivationResult(false, ActivationMode.SHIZUKU,
-                        "Shizuku execution failed.\nMake sure Shizuku is running and Beta Manager is granted permission."
+                        "Shizuku runtime setup failed: ${result.message}"
                     )
                 }
             }
@@ -172,10 +195,10 @@ class AdbActivator(private val context: Context) {
 
     private suspend fun retryConnectShizuku(retries: Int, delayMs: Long): Boolean {
         for (i in 0 until retries) {
-            if (ShizukuShell.isServiceRunning()) return true
+            if (client.isServiceRunning()) return true
             kotlinx.coroutines.delay(delayMs)
         }
-        return ShizukuShell.isServiceRunning()
+        return client.isServiceRunning()
     }
 
     private suspend fun retryConnect(retries: Int, delayMs: Long): Boolean {

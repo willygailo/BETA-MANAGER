@@ -40,7 +40,7 @@ fun WebUIScreen(
     var service by remember { mutableStateOf<IBetaService?>(null) }
     var status by remember { mutableStateOf("Loading...") }
 
-    LaunchedEffect(pluginId) {
+    DisposableEffect(pluginId) {
         val intent = Intent(context, Class.forName("beta.manager.service.BetaService"))
         val conn = object : ServiceConnection {
             override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
@@ -50,6 +50,12 @@ fun WebUIScreen(
             override fun onServiceDisconnected(name: ComponentName?) { service = null }
         }
         context.bindService(intent, conn, Context.BIND_AUTO_CREATE)
+        onDispose {
+            try {
+                context.unbindService(conn)
+            } catch (_: Exception) {
+            }
+        }
     }
 
     Scaffold(
@@ -87,7 +93,7 @@ fun WebUIScreen(
                         settings.javaScriptEnabled = true
                         settings.domStorageEnabled = true
                         settings.allowFileAccess = true
-                        addJavascriptInterface(KsuBridge(service, ctx), "ksu")
+                        addJavascriptInterface(KsuBridge({ service }, ctx), "ksu")
                         webViewClient = object : WebViewClient() {
                             override fun onPageFinished(view: WebView?, url: String?) {
                                 status = "Ready"
@@ -143,13 +149,13 @@ fun WebUIScreen(
 }
 
 private class KsuBridge(
-    private val service: IBetaService?,
+    private val serviceProvider: () -> IBetaService?,
     private val context: Context
 ) {
     @JavascriptInterface
     fun exec(command: String): String {
         return try {
-            service?.executeCommand(command) ?: "ERROR: Service not connected"
+            serviceProvider()?.executeCommand(command) ?: "ERROR: Service not connected"
         } catch (e: Exception) {
             "ERROR: ${e.message}"
         }

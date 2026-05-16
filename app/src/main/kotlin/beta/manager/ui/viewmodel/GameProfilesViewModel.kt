@@ -1,6 +1,7 @@
 package beta.manager.ui.viewmodel
 
 import android.app.Application
+import android.os.Build
 import android.content.pm.PackageManager
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -71,7 +72,12 @@ class GameProfilesViewModel(application: Application) : AndroidViewModel(applica
         val pm = context.packageManager
         return knownGames.map { game ->
             val installed = try {
-                pm.getPackageInfo(game.packageName, PackageManager.PackageInfoFlags.of(0))
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    pm.getPackageInfo(game.packageName, PackageManager.PackageInfoFlags.of(0))
+                } else {
+                    @Suppress("DEPRECATION")
+                    pm.getPackageInfo(game.packageName, 0)
+                }
                 true
             } catch (_: Exception) { false }
             game.copy(isInstalled = installed)
@@ -136,7 +142,7 @@ class GameProfilesViewModel(application: Application) : AndroidViewModel(applica
             "echo 1 > /sys/class/kgsl/kgsl-3d0/force_clk_on 2>/dev/null"
         )
         withContext(Dispatchers.IO) {
-            cmds.forEach { Shell.execute(it) }
+            cmds.forEach { Shell.executeWithElevation(it) }
         }
     }
 }

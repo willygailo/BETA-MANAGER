@@ -1,5 +1,6 @@
 package beta.manager.utils
 
+import android.content.pm.PackageManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import rikka.shizuku.Shizuku
@@ -7,6 +8,8 @@ import java.io.BufferedReader
 import java.io.InputStreamReader
 
 object ShizukuShell {
+
+    const val REQUEST_PERMISSION_CODE = 6201
 
     suspend fun isAvailable(): Boolean = withContext(Dispatchers.Main) {
         try {
@@ -24,9 +27,31 @@ object ShizukuShell {
         }
     }
 
+    suspend fun hasPermission(): Boolean = withContext(Dispatchers.Main) {
+        try {
+            Shizuku.pingBinder() &&
+                !Shizuku.isPreV11() &&
+                Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    suspend fun requestPermission(requestCode: Int = REQUEST_PERMISSION_CODE): Boolean = withContext(Dispatchers.Main) {
+        try {
+            if (!Shizuku.pingBinder() || Shizuku.isPreV11()) return@withContext false
+            if (Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED) return@withContext true
+            if (Shizuku.shouldShowRequestPermissionRationale()) return@withContext false
+            Shizuku.requestPermission(requestCode)
+            true
+        } catch (_: Exception) {
+            false
+        }
+    }
+
     suspend fun isShellUid(): Boolean = withContext(Dispatchers.Main) {
         try {
-            Shizuku.getUid() == 2000
+            hasPermission() && Shizuku.getUid() == 2000
         } catch (_: Exception) {
             false
         }
@@ -34,7 +59,7 @@ object ShizukuShell {
 
     suspend fun isRootUid(): Boolean = withContext(Dispatchers.Main) {
         try {
-            Shizuku.getUid() == 0
+            hasPermission() && Shizuku.getUid() == 0
         } catch (_: Exception) {
             false
         }
@@ -42,6 +67,10 @@ object ShizukuShell {
 
     suspend fun execute(command: String, timeout: Long = 30000L): Shell.Result = withContext(Dispatchers.IO) {
         try {
+            if (!hasPermission()) {
+                return@withContext Shell.Result.Error("Shizuku permission is not granted")
+            }
+
             val proc = newShizukuProcess(arrayOf("sh", "-c", command))
             val stdout = StringBuilder()
             val stderr = StringBuilder()
