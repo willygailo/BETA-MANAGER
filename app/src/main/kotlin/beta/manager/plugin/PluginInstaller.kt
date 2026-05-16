@@ -108,17 +108,16 @@ class PluginInstaller(
                     "SKIPUNZIP" to ""
                 )
                 val envStr = env.entries.joinToString(" ") { (k, v) -> "${k}=${v}" }
-                Shell.execute("$envStr sh '${customizeSh.absolutePath}'")
+                Shell.executeWithElevation("$envStr sh '${customizeSh.absolutePath}'")
             }
 
-            val pluginDir = File(targetDir)
-            if (pluginDir.exists()) {
-                pluginDir.deleteRecursively()
-            }
-            tempDir.copyRecursively(pluginDir, overwrite = true)
-            File(pluginDir, "disable")?.delete()
+            Shell.executeWithElevation("rm -rf '$targetDir'")
+            Shell.executeWithElevation("mkdir -p '$targetDir'")
+            Shell.executeWithElevation("cp -rf '${tempDir.absolutePath}'/. '$targetDir/'")
+            Shell.executeWithElevation("chmod -R 755 '$targetDir'")
+            Shell.executeWithElevation("rm -f '$targetDir/disable' 2>/dev/null")
 
-            val action = if (flashToMagisk) "Flashed to ${pluginDir.parentFile?.name}" else "Installed"
+            val action = if (flashToMagisk) "Flashed to ${File(targetDir).parentFile?.name}" else "Installed"
             return InstallResult(true, "$action successfully: ${props["name"] ?: pluginId} (v${props["version"] ?: "1.0"})", pluginId)
 
         } catch (e: Exception) {
