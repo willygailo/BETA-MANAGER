@@ -2,7 +2,7 @@
   <br>
   <h1>📦 BETA MANAGER PLUGIN TUTORIAL</h1>
   <p><strong>Gawing tama ang iyong plugin module ZIP para sa Beta Manager</strong></p>
-  <p>Magisk/KernelSU-style modules · No root required · ADB-level permissions</p>
+  <p>Magisk/KernelSU-style modules · Root + Shizuku · Shell-level permissions</p>
   <br>
 </div>
 
@@ -29,16 +29,18 @@
 
 ## 🔧 WHAT IS A PLUGIN?
 
-Ang **Beta Manager plugin** ay isang ZIP file na naglalaman ng scripts at binaries na nagma-modify ng system behavior — katulad ng **Magisk/KernelSU modules**, pero **walang kailangan na root**.
+Ang **Beta Manager plugin** ay isang ZIP file na naglalaman ng scripts at binaries na nagma-modify ng system behavior — katulad ng **Magisk/KernelSU modules**. Gumagana ito sa **both rooted at non-rooted devices**.
 
 | Feature | Magisk Module | Beta Manager Plugin |
 |---------|--------------|-------------------|
-| Root required | ✅ Yes | ❌ **No** |
+| Root required | ✅ Yes | ❌ **No** (Shizuku kung non-rooted) |
 | Runtime dir | `/data/adb/modules/` | `/data/user_de/0/com.android.shell/beta/plugins/` |
-| Permission level | Root (init) | ADB (`com.android.shell`) |
+| Scanned dirs | `/data/adb/modules/` | Beta + AxManager + Magisk + KSU |
+| Permission level | Root (init) | Shell-level (su or Shizuku) |
 | Script format | `sh` scripts | `sh` scripts |
 | WebUI support | `ksu.exec` bridge | `ksu.exec` bridge |
 | BusyBox bundled | Built-in | Built-in |
+| Device support | Rooted only | **Rooted + Non-rooted** |
 
 ---
 
@@ -468,12 +470,15 @@ echo "✅ Done: ${PLUGIN_ID}_${VERSION}.zip"
 ### Via Beta Manager App
 
 1. Buksan ang Beta Manager
-2. I-activate ang service (Wireless Debugging / ADB / Root)
-3. Pumunta sa **Plugins** tab
-4. I-tap ang **"Install ZIP"** button
-5. Piliin ang plugin ZIP file
+2. **Auto-activate** ang service (Root→`su`, Non-root→**Shizuku**)
+3. Sa **Home Dashboard**, i-tap ang **Install** quick action
+4. Piliin ang ZIP file ng module
+5. Pumili ng **Flash Target**:
+   - 🔵 **Beta Manager** — install sa `/data/user_de/0/com.android.shell/beta/plugins/`
+   - 🟢 **Magisk Modules** — flash sa `/data/adb/modules/`
+   - 🟣 **KernelSU Modules** — flash sa `/data/adb/ksu/modules/`
 6. Hintaying mag-success ang installation
-7. I-enable ang plugin sa plugin list
+7. I-enable ang module sa dashboard
 
 ### Via ADB (Manual)
 
@@ -500,6 +505,8 @@ adb shell "ls -la /data/user_de/0/com.android.shell/beta/plugins/"
 ```bash
 adb shell "cat /data/user_de/0/com.android.shell/beta/logs/*.log"
 ```
+
+O di kaya sa app mismo: Home → **Logs** quick action → view service logs. Like Magisk Log.
 
 ### Test action.sh manually
 
@@ -722,7 +729,8 @@ Bago mo i-release ang plugin mo, tiyakin na:
 
 - [ ] May `module.prop` na may kumpletong fields
 - [ ] Ang `id` ay valid format (no spaces, no special chars)
-- [ ] Ang `betaPlugin` version ay tama (`<= 10001`)
+- [ ] Ang `betaPlugin` version ay tama (`<= ${PluginManager.SERVER_VERSION}`)
+- [ ] Pumili ng tamang **Flash Target** (Beta / Magisk / KSU)
 - [ ] Lahat ng `.sh` files ay **executable** (`chmod +x`)
 - [ ] Lahat ng scripts ay may **shebang** (`#!/system/bin/sh`)
 - [ ] Ginagamit ang `$MODDIR` imbes na hardcoded paths
@@ -735,12 +743,11 @@ Bago mo i-release ang plugin mo, tiyakin na:
 <div align="center">
   <hr>
   <p>
-    <strong>⚡ BETA MANAGER</strong> — <em>Level up your gaming performance</em>
+    <strong>⚡ BETA MANAGER</strong> — <em>Universal Module Manager (Root + Non-rooted)</em>
   </p>
   <p>
     <a href="https://github.com/willygailo/BETA-MANAGER">GitHub</a> ·
-    <a href="README.md">README</a> ·
-    <a href="ARCHITECTURE.md">Architecture</a>
+    <a href="README.md">README</a>
   </p>
   <br>
 </div>
