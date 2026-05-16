@@ -20,6 +20,14 @@ object Shell {
 
     fun setDebugMode(enabled: Boolean) { debugMode = enabled }
 
+    suspend fun executeWithElevation(command: String, timeout: Long = 30000L): Result {
+        return if (isRootAvailable()) {
+            execute(command, timeout, useRoot = true)
+        } else {
+            ShizukuShell.execute(command, timeout)
+        }
+    }
+
     suspend fun execute(command: String, timeout: Long = 30000L, useRoot: Boolean = false): Result = withContext(Dispatchers.IO) {
         val startTime = System.currentTimeMillis()
         try {

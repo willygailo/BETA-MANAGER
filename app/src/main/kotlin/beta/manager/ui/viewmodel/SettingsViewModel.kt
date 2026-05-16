@@ -49,9 +49,9 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch {
             prefs.setThermalControl(enabled)
             if (enabled) {
-                Shell.execute("sh -c 'echo performance > /sys/class/thermal/thermal_message/sconfig 2>/dev/null || echo 0 > /sys/class/thermal/thermal_zone0/mode 2>/dev/null'")
+                Shell.executeWithElevation("sh -c 'echo performance > /sys/class/thermal/thermal_message/sconfig 2>/dev/null || echo 0 > /sys/class/thermal/thermal_zone0/mode 2>/dev/null'")
             } else {
-                Shell.execute("sh -c 'echo disabled > /sys/class/thermal/thermal_message/sconfig 2>/dev/null || echo 1 > /sys/class/thermal/thermal_zone0/mode 2>/dev/null'")
+                Shell.executeWithElevation("sh -c 'echo disabled > /sys/class/thermal/thermal_message/sconfig 2>/dev/null || echo 1 > /sys/class/thermal/thermal_zone0/mode 2>/dev/null'")
             }
         }
     }
@@ -60,9 +60,9 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch {
             prefs.setCpuGovernor(enabled)
             if (enabled) {
-                Shell.execute("for cpu in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do echo performance > \$cpu 2>/dev/null; done")
+                Shell.executeWithElevation("for cpu in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do echo performance > \$cpu 2>/dev/null; done")
             } else {
-                Shell.execute("for cpu in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do echo schedutil > \$cpu 2>/dev/null; done")
+                Shell.executeWithElevation("for cpu in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do echo schedutil > \$cpu 2>/dev/null; done")
             }
         }
     }
@@ -71,9 +71,9 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch {
             prefs.setGpuBoost(enabled)
             if (enabled) {
-                Shell.execute("sh -c 'echo 1 > /sys/class/kgsl/kgsl-3d0/force_bus_on 2>/dev/null; echo 1 > /sys/class/kgsl/kgsl-3d0/force_clk_on 2>/dev/null; echo 1 > /sys/class/kgsl/kgsl-3d0/force_rail_on 2>/dev/null; echo 100 > /sys/class/kgsl/kgsl-3d0/devfreq/max_freq 2>/dev/null'")
+                Shell.executeWithElevation("sh -c 'echo 1 > /sys/class/kgsl/kgsl-3d0/force_bus_on 2>/dev/null; echo 1 > /sys/class/kgsl/kgsl-3d0/force_clk_on 2>/dev/null; echo 1 > /sys/class/kgsl/kgsl-3d0/force_rail_on 2>/dev/null; echo 100 > /sys/class/kgsl/kgsl-3d0/devfreq/max_freq 2>/dev/null'")
             } else {
-                Shell.execute("sh -c 'echo 0 > /sys/class/kgsl/kgsl-3d0/force_bus_on 2>/dev/null; echo 0 > /sys/class/kgsl/kgsl-3d0/force_clk_on 2>/dev/null; echo 0 > /sys/class/kgsl/kgsl-3d0/force_rail_on 2>/dev/null'")
+                Shell.executeWithElevation("sh -c 'echo 0 > /sys/class/kgsl/kgsl-3d0/force_bus_on 2>/dev/null; echo 0 > /sys/class/kgsl/kgsl-3d0/force_clk_on 2>/dev/null; echo 0 > /sys/class/kgsl/kgsl-3d0/force_rail_on 2>/dev/null'")
             }
         }
     }
@@ -112,9 +112,9 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             prefs.setAdvDebug(enabled)
             Shell.setDebugMode(enabled)
             if (enabled) {
-                Shell.execute("setprop debug.beta.manager 1 2>/dev/null")
+                Shell.executeWithElevation("setprop debug.beta.manager 1 2>/dev/null")
             } else {
-                Shell.execute("setprop debug.beta.manager 0 2>/dev/null")
+                Shell.executeWithElevation("setprop debug.beta.manager 0 2>/dev/null")
             }
         }
     }
@@ -122,8 +122,8 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     private suspend fun applyPerformanceTweaks() {
         val s = _settings.value
         if (s.gamingMode) {
-            if (s.cpuGovernor) Shell.execute("for cpu in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do echo performance > \$cpu 2>/dev/null; done")
-            if (s.gpuBoost) Shell.execute("echo 1 > /sys/class/kgsl/kgsl-3d0/force_bus_on 2>/dev/null; echo 1 > /sys/class/kgsl/kgsl-3d0/force_clk_on 2>/dev/null")
+            if (s.cpuGovernor) Shell.executeWithElevation("for cpu in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do echo performance > \$cpu 2>/dev/null; done")
+            if (s.gpuBoost) Shell.executeWithElevation("echo 1 > /sys/class/kgsl/kgsl-3d0/force_bus_on 2>/dev/null; echo 1 > /sys/class/kgsl/kgsl-3d0/force_clk_on 2>/dev/null")
         }
     }
 }

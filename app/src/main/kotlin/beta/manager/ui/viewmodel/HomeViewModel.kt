@@ -185,13 +185,13 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             val current = _uiState.value.isGameBoosted
             _uiState.value = _uiState.value.copy(isBoosting = true)
             if (!current) {
-                Shell.execute("for cpu in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do echo performance > \$cpu 2>/dev/null; done")
-                Shell.execute("echo 1 > /sys/class/kgsl/kgsl-3d0/force_bus_on 2>/dev/null; echo 1 > /sys/class/kgsl/kgsl-3d0/force_clk_on 2>/dev/null")
-                Shell.execute("echo 0 > /sys/class/kgsl/kgsl-3d0/max_pwrlevel 2>/dev/null")
-                Shell.execute("echo 1 > /proc/sys/vm/compact_memory 2>/dev/null")
+                Shell.executeWithElevation("for cpu in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do echo performance > \$cpu 2>/dev/null; done")
+                Shell.executeWithElevation("echo 1 > /sys/class/kgsl/kgsl-3d0/force_bus_on 2>/dev/null; echo 1 > /sys/class/kgsl/kgsl-3d0/force_clk_on 2>/dev/null")
+                Shell.executeWithElevation("echo 0 > /sys/class/kgsl/kgsl-3d0/max_pwrlevel 2>/dev/null")
+                Shell.executeWithElevation("echo 1 > /proc/sys/vm/compact_memory 2>/dev/null")
             } else {
-                Shell.execute("for cpu in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do echo schedutil > \$cpu 2>/dev/null; done")
-                Shell.execute("echo 0 > /sys/class/kgsl/kgsl-3d0/force_bus_on 2>/dev/null; echo 0 > /sys/class/kgsl/kgsl-3d0/force_clk_on 2>/dev/null")
+                Shell.executeWithElevation("for cpu in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do echo schedutil > \$cpu 2>/dev/null; done")
+                Shell.executeWithElevation("echo 0 > /sys/class/kgsl/kgsl-3d0/force_bus_on 2>/dev/null; echo 0 > /sys/class/kgsl/kgsl-3d0/force_clk_on 2>/dev/null")
             }
             prefs.setGameBoostActive(!current)
             _uiState.value = _uiState.value.copy(isGameBoosted = !current, isBoosting = false)

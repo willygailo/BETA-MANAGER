@@ -144,34 +144,38 @@ class AdbActivator(private val context: Context) {
                 )
             }
 
-            val uid = ShizukuShell.getVersion()
             val isElevated = ShizukuShell.isShellUid() || ShizukuShell.isRootUid()
-
             val cmd = listOf(
-                "export CLASSPATH=$(pm path beta.manager | grep base)",
-                "app_process /system/bin beta.manager.service.BetaService &"
+                "export CLASSPATH=\$(pm path beta.manager | grep base)",
+                "nohup app_process /system/bin beta.manager.service.BetaService > /dev/null 2>&1 &"
             ).joinToString(" && ")
 
-            when (Shell.execute(cmd)) {
+            when (ShizukuShell.execute(cmd)) {
                 is Shell.Result.Success -> {
-                    val running = retryConnect(3, 500)
+                    val running = retryConnectShizuku(5, 1000)
                     if (running) {
-                        val mode = if (isElevated) "elevated" else "standard"
-                        return ActivationResult(true, ActivationMode.SHIZUKU, "Service started via Shizuku ($mode)")
+                        val level = if (isElevated) "elevated" else "standard"
+                        return ActivationResult(true, ActivationMode.SHIZUKU, "Service started via Shizuku ($level)")
                     }
                 }
                 is Shell.Result.Error -> {
-                    val running = client.startService()
-                    if (running) {
-                        return ActivationResult(true, ActivationMode.SHIZUKU, "Service started via Shizuku")
-                    }
-                    return ActivationResult(false, ActivationMode.SHIZUKU, "Shizuku execution failed. Try ADB or Root mode.")
+                    return ActivationResult(false, ActivationMode.SHIZUKU,
+                        "Shizuku execution failed.\nMake sure Shizuku is running and Beta Manager is granted permission."
+                    )
                 }
             }
             return ActivationResult(false, ActivationMode.SHIZUKU, "Shizuku activation failed")
         } catch (e: Exception) {
             return ActivationResult(false, ActivationMode.SHIZUKU, "Error: ${e.message}")
         }
+    }
+
+    private suspend fun retryConnectShizuku(retries: Int, delayMs: Long): Boolean {
+        for (i in 0 until retries) {
+            if (ShizukuShell.isServiceRunning()) return true
+            kotlinx.coroutines.delay(delayMs)
+        }
+        return ShizukuShell.isServiceRunning()
     }
 
     private suspend fun retryConnect(retries: Int, delayMs: Long): Boolean {

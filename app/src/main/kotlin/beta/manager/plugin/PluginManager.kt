@@ -200,7 +200,7 @@ class PluginManager(private val pluginsDir: String) {
         )
 
         val envStr = env.entries.joinToString(" ") { (k, v) -> "${k}=${v}" }
-        val result = Shell.execute("$envStr sh '${actionScript.absolutePath}'")
+        val result = Shell.executeWithElevation("$envStr sh '${actionScript.absolutePath}'")
         return result is Shell.Result.Success
     }
 
@@ -225,10 +225,10 @@ class PluginManager(private val pluginsDir: String) {
             val envStr = env.entries.joinToString(" ") { (k, v) -> "${k}=${v}" }
 
             if (postFsData.exists()) {
-                Shell.execute("$envStr sh '${postFsData.absolutePath}'")
+                Shell.executeWithElevation("$envStr sh '${postFsData.absolutePath}'")
             }
             if (serviceSh.exists()) {
-                Shell.execute("$envStr sh '${serviceSh.absolutePath}' &")
+                Shell.executeWithElevation("$envStr sh '${serviceSh.absolutePath}' &")
             }
         }
     }
@@ -236,7 +236,7 @@ class PluginManager(private val pluginsDir: String) {
     private suspend fun cleanupPlugin(dir: File) {
         val uninstallScript = File(dir, "uninstall.sh")
         if (uninstallScript.exists()) {
-            Shell.execute("sh '${uninstallScript.absolutePath}'")
+            Shell.executeWithElevation("sh '${uninstallScript.absolutePath}'")
         }
         dir.deleteRecursively()
     }
