@@ -273,17 +273,28 @@ my_perf_module.zip
 ### 📝 module.prop Format
 
 ```properties
-id=my_perf_module
-name=My Performance Module
-version=v1.0.0
-versionCode=1
-author=YourName
-description=CPU/GPU optimization module
-betaPlugin=1          ← Must be <= Beta Manager server version
+id=cpu_boost
+name=CPU Performance Booster
+version=v2.0.0
+versionCode=2
+author=Willy Jr. C. Gailo
+description=CPU governor tweaks, GPU boost, memory optimization
+betaPlugin=10001
+axeronPlugin=10001
 ```
 
 > **🔄 AxManager Compatible:** Pwedeng gumamit ng `axeronPlugin` imbes na `betaPlugin`.  
 > Auto-detect ng Beta Manager kung alin ang present.
+
+### 🎯 Sample Plugin
+
+Nasa repo na ang sample plugin: [`cpu boost/`](cpu%20boost/)
+
+```bash
+cd "cpu boost"
+chmod +x *.sh
+./build.sh     # creates cpu_boost_v2.0.0.zip
+```
 
 ### 🌍 Environment Variables
 
@@ -491,6 +502,20 @@ export ANDROID_HOME=/path/to/android-sdk
 
 # 📍 APK location:
 #    app/build/outputs/apk/debug/app-debug.apk
+
+# 📱 Install sa connected phone
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+```
+
+### 📦 Build Sample Plugin
+
+```bash
+cd "cpu boost"
+chmod +x *.sh
+./build.sh     # creates cpu_boost_v2.0.0.zip
+
+# Push sa phone para i-install via Beta Manager
+adb push cpu_boost_v2.0.0.zip /sdcard/
 ```
 
 <div align="center">

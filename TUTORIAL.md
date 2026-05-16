@@ -516,210 +516,105 @@ adb shell "sh /data/user_de/0/com.android.shell/beta/plugins/my_perf_module/acti
 
 ---
 
-## 🎯 SAMPLE PLUGIN
+## 🎯 SAMPLE PLUGIN — CPU BOOST
 
-Narito ang kumpletong halimbawa ng **Game Performance Booster** plugin:
+Ang reference sample ay nasa [`cpu boost/`](cpu%20boost/) directory ng repo. Buuin mo gamit ang:
+
+```bash
+cd "cpu boost"
+chmod +x *.sh
+./build.sh
+# → cpu_boost_v2.0.0.zip
+```
 
 ### `module.prop`
 
 ```properties
-id=game_booster
-name=Game Performance Booster
-version=v1.0.0
-versionCode=1
+id=cpu_boost
+name=CPU Performance Booster
+version=v2.0.0
+versionCode=2
 author=Willy Jr. C. Gailo
-description=CPU/GPU/memory tweaks para sa gaming
+description=CPU governor tweaks, GPU boost, memory optimization, thermal control
 betaPlugin=10001
+axeronPlugin=10001
 ```
 
 ### `service.sh`
 
+May watchdog loop na nagre-re-apply ng tweaks every 60 seconds:
+
 ```sh
 #!/system/bin/sh
-
 MODDIR=${0%/*}
+LOG="/data/user_de/0/com.android.shell/beta/logs/cpu_boost.log"
 
-sleep 10
+log() { echo "[$(date '+%H:%M:%S')] $1" >> "$LOG" 2>/dev/null; }
+log "CPU Booster starting..."
 
-# CPU: Performance governor
+sleep 20
+
+# CPU
 for cpu in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do
-    echo "performance" > $cpu 2>/dev/null
+  echo "performance" > "$cpu" 2>/dev/null
 done
 
-# GPU: Force max performance
+# GPU
 echo 1 > /sys/class/kgsl/kgsl-3d0/force_bus_on 2>/dev/null
 echo 1 > /sys/class/kgsl/kgsl-3d0/force_clk_on 2>/dev/null
-echo 1 > /sys/class/kgsl/kgsl-3d0/force_rail_on 2>/dev/null
 echo 0 > /sys/class/kgsl/kgsl-3d0/max_pwrlevel 2>/dev/null
 
-# Memory: Aggressive
+# Memory
 echo 0 > /proc/sys/vm/swappiness 2>/dev/null
-echo 50 > /proc/sys/vm/dirty_ratio 2>/dev/null
-echo 30 > /proc/sys/vm/dirty_background_ratio 2>/dev/null
 echo 1 > /proc/sys/vm/compact_memory 2>/dev/null
 
-# Scheduler: Reduce latency
-echo "noop" > /sys/block/mmcblk0/queue/scheduler 2>/dev/null
-echo 128 > /sys/block/mmcblk0/queue/read_ahead_kb 2>/dev/null
-
-# Thermal: Disable throttling (if available)
+# Thermal
 echo "disabled" > /sys/class/thermal/thermal_message/sconfig 2>/dev/null
-echo 0 > /sys/class/thermal/thermal_zone0/mode 2>/dev/null
 
-# Monitor loop
-while true; do
-    sleep 30
-    # Re-apply CPU governor
-    for cpu in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do
-        CURRENT=$(cat $cpu 2>/dev/null)
-        if [ "$CURRENT" != "performance" ]; then
-            echo "performance" > $cpu 2>/dev/null
-        fi
-    done
-done
+# Watchdog
+while true; do sleep 60; done
 ```
+
+Full version with logging: [`cpu boost/service.sh`](cpu%20boost/service.sh)
 
 ### `action.sh`
 
+Nagpi-print ng live status ng CPU governors, GPU, memory, temperatura:
+
 ```sh
 #!/system/bin/sh
-
-echo "=== GAME BOOSTER STATUS ==="
 echo ""
-
-echo "CPU Governors:"
+echo "╔══════════════════════════════════════╗"
+echo "║    CPU PERFORMANCE BOOSTER v2.0    ║"
+echo "╚══════════════════════════════════════╝"
+echo ""
+echo "≡ CPU Governors:"
 for cpu in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do
-    echo "  $(basename $(dirname $cpu)): $(cat $cpu 2>/dev/null)"
+  name=$(basename $(dirname "$cpu"))
+  echo "  ${name}: $(cat "$cpu" 2>/dev/null)"
 done
-
 echo ""
-echo "GPU:"
+echo "≡ GPU Status:"
 echo "  Force bus: $(cat /sys/class/kgsl/kgsl-3d0/force_bus_on 2>/dev/null)"
-echo "  Force clk: $(cat /sys/class/kgsl/kgsl-3d0/force_clk_on 2>/dev/null)"
-
 echo ""
-echo "Memory:"
-echo "  Swappiness: $(cat /proc/sys/vm/swappiness 2>/dev/null)"
-
-echo ""
-echo "Temperature:"
-cat /sys/class/thermal/thermal_zone*/temp 2>/dev/null | while read temp; do
-    echo "  $((temp / 1000))°C"
+echo "≡ Temperature:"
+for zone in /sys/class/thermal/thermal_zone*/temp; do
+  temp=$(cat "$zone" 2>/dev/null)
+  echo "  $((temp / 1000))°C"
 done
-
-echo ""
-echo "=== DONE ==="
 ```
+
+Full version: [`cpu boost/action.sh`](cpu%20boost/action.sh)
 
 ### `webroot/index.html`
 
-```html
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Game Booster</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            background: #0D0D14;
-            color: #E8E8F0;
-            font-family: 'Courier New', monospace;
-            padding: 20px;
-            text-align: center;
-        }
-        h1 { color: #00E5FF; font-size: 24px; margin: 20px 0; }
-        .card {
-            background: #1A1A26;
-            border-radius: 12px;
-            padding: 20px;
-            margin: 10px 0;
-        }
-        .stat {
-            display: inline-block;
-            margin: 10px;
-            padding: 15px;
-            background: #252536;
-            border-radius: 8px;
-            min-width: 120px;
-        }
-        .stat-value { color: #00E5FF; font-size: 28px; font-weight: bold; }
-        .stat-label { color: #6E6E8A; font-size: 12px; margin-top: 4px; }
-        button {
-            background: linear-gradient(135deg, #00E5FF, #7C4DFF);
-            color: #fff;
-            border: none;
-            padding: 15px 40px;
-            border-radius: 12px;
-            font-size: 16px;
-            font-weight: bold;
-            cursor: pointer;
-            margin: 10px;
-        }
-        button:active { transform: scale(0.95); }
-        pre {
-            background: #0D0D14;
-            padding: 15px;
-            border-radius: 8px;
-            text-align: left;
-            font-size: 12px;
-            color: #9E9EB8;
-            margin-top: 15px;
-        }
-    </style>
-</head>
-<body>
-    <h1>⚡ GAME BOOSTER</h1>
-    <div class="card">
-        <button onclick="applyBoost()">APPLY BOOST</button>
-        <button onclick="getStatus()" style="background: #252536;">GET STATUS</button>
-    </div>
-    <div class="card">
-        <div class="stat">
-            <div class="stat-value" id="cpuStat">--</div>
-            <div class="stat-label">CPU Governor</div>
-        </div>
-        <div class="stat">
-            <div class="stat-value" id="gpuStat">--</div>
-            <div class="stat-label">GPU State</div>
-        </div>
-        <div class="stat">
-            <div class="stat-value" id="tempStat">--</div>
-            <div class="stat-label">Temperature</div>
-        </div>
-    </div>
-    <pre id="output">Ready.</pre>
+Interactive WebUI may toggle switches para sa CPU/GPU/Memory/Thermal at live stats:
 
-    <script>
-        function applyBoost() {
-            const out = document.getElementById('output');
-            out.textContent = 'Applying boost...';
+![WebUI](https://img.shields.io/badge/WebUI-KernelSU_compatible-00E5FF)
 
-            const cpuResult = ksu.exec('for cpu in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do echo performance > $cpu 2>/dev/null; done');
-            const gpuResult = ksu.exec('echo 1 > /sys/class/kgsl/kgsl-3d0/force_bus_on 2>/dev/null; echo 1 > /sys/class/kgsl/kgsl-3d0/force_clk_on 2>/dev/null');
+Open sa Beta Manager → tap **WebUI** button sa plugin card.
 
-            out.textContent = 'CPU: ' + (cpuResult.includes('ERROR') ? 'Failed' : 'Boosted') + '\n';
-            out.textContent += 'GPU: ' + (gpuResult.includes('ERROR') ? 'Failed' : 'Boosted');
-
-            ksu.toast('Game Boost Applied!');
-            getStatus();
-        }
-
-        function getStatus() {
-            const governor = ksu.exec("cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor 2>/dev/null || echo 'N/A'");
-            const gpuForce = ksu.exec("cat /sys/class/kgsl/kgsl-3d0/force_bus_on 2>/dev/null || echo 'N/A'");
-            const temp = ksu.exec("cat /sys/class/thermal/thermal_zone0/temp 2>/dev/null || echo '0'");
-
-            document.getElementById('cpuStat').textContent = governor.trim();
-            document.getElementById('gpuStat').textContent = gpuForce.trim() === '1' ? 'Boosted' : 'Normal';
-            document.getElementById('tempStat').textContent = Math.floor(parseInt(temp.trim()) / 1000) + '°C';
-        }
-
-        getStatus();
-    </script>
-</body>
-</html>
-```
+Full source: [`cpu boost/webroot/index.html`](cpu%20boost/webroot/index.html)
 
 ---
 
@@ -729,25 +624,31 @@ Bago mo i-release ang plugin mo, tiyakin na:
 
 - [ ] May `module.prop` na may kumpletong fields
 - [ ] Ang `id` ay valid format (no spaces, no special chars)
-- [ ] Ang `betaPlugin` version ay tama (`<= ${PluginManager.SERVER_VERSION}`)
+- [ ] Ang `betaPlugin` version ay tama (`<= 10001`)
 - [ ] Pumili ng tamang **Flash Target** (Beta / Magisk / KSU)
 - [ ] Lahat ng `.sh` files ay **executable** (`chmod +x`)
 - [ ] Lahat ng scripts ay may **shebang** (`#!/system/bin/sh`)
 - [ ] Ginagamit ang `$MODDIR` imbes na hardcoded paths
 - [ ] May `uninstall.sh` para mag-restore ng stock settings
+- [ ] May logging sa `/data/user_de/0/com.android.shell/beta/logs/`
 - [ ] Ang ZIP ay **directly zipped** (hindi naka-folder sa loob)
-- [ ] Tested sa Beta Manager app
+- [ ] Build gamit `build.sh` at test sa Beta Manager app
+
+---
+
+> 💡 **Reference plugin:** Tingnan ang [`cpu boost/`](cpu%20boost/) directory sa repo — complete working sample.
 
 ---
 
 <div align="center">
   <hr>
   <p>
-    <strong>⚡ BETA MANAGER</strong> — <em>Universal Module Manager (Root + Non-rooted)</em>
+    <strong>⚡ BETA MANAGER v1.2.0</strong> — <em>Universal Module Manager (Root + Non-rooted)</em>
   </p>
   <p>
     <a href="https://github.com/willygailo/BETA-MANAGER">GitHub</a> ·
-    <a href="README.md">README</a>
+    <a href="README.md">README</a> ·
+    <a href="cpu%20boost/build.sh">Sample Plugin</a>
   </p>
   <br>
 </div>
