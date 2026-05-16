@@ -37,17 +37,18 @@ object ShizukuShell {
         }
     }
 
-    suspend fun requestPermission(requestCode: Int = REQUEST_PERMISSION_CODE): Boolean = withContext(Dispatchers.Main) {
-        try {
-            if (!Shizuku.pingBinder() || Shizuku.isPreV11()) return@withContext false
-            if (Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED) return@withContext true
-            if (Shizuku.shouldShowRequestPermissionRationale()) return@withContext false
-            Shizuku.requestPermission(requestCode)
-            true
-        } catch (_: Exception) {
-            false
+    suspend fun requestPermission(requestCode: Int = REQUEST_PERMISSION_CODE): Boolean =
+        withContext(Dispatchers.Main) {
+            try {
+                if (!Shizuku.pingBinder() || Shizuku.isPreV11()) return@withContext false
+                if (Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED) return@withContext true
+                if (Shizuku.shouldShowRequestPermissionRationale()) return@withContext false
+                Shizuku.requestPermission(requestCode)
+                true
+            } catch (_: Exception) {
+                false
+            }
         }
-    }
 
     suspend fun isShellUid(): Boolean = withContext(Dispatchers.Main) {
         try {
@@ -65,60 +66,69 @@ object ShizukuShell {
         }
     }
 
-    suspend fun execute(command: String, timeout: Long = 30000L): Shell.Result = withContext(Dispatchers.IO) {
-        try {
-            if (!hasPermission()) {
-                return@withContext Shell.Result.Error("Shizuku permission is not granted")
-            }
+    suspend fun execute(command: String, timeout: Long = 30000L): Shell.Result =
+        withContext(Dispatchers.IO) {
+            try {
+                if (!hasPermission()) {
+                    return@withContext Shell.Result.Error("Shizuku permission is not granted")
+                }
 
-            val proc = newShizukuProcess(arrayOf("sh", "-c", command))
-            val stdout = StringBuilder()
-            val stderr = StringBuilder()
+                val proc = newShizukuProcess(arrayOf("sh", "-c", command))
+                val stdout = StringBuilder()
+                val stderr = StringBuilder()
 
-            val stdoutReader = Thread {
-                BufferedReader(InputStreamReader(proc.inputStream)).use { reader ->
-                    var line: String?
-                    while (reader.readLine().also { line = it } != null) {
-                        stdout.appendLine(line)
+                val stdoutReader = Thread {
+                    BufferedReader(InputStreamReader(proc.inputStream)).use { reader ->
+                        var line: String?
+                        while (reader.readLine().also { line = it } != null) {
+                            stdout.appendLine(line)
+                        }
                     }
                 }
-            }
-            val stderrReader = Thread {
-                BufferedReader(InputStreamReader(proc.errorStream)).use { reader ->
-                    var line: String?
-                    while (reader.readLine().also { line = it } != null) {
-                        stderr.appendLine(line)
+                val stderrReader = Thread {
+                    BufferedReader(InputStreamReader(proc.errorStream)).use { reader ->
+                        var line: String?
+                        while (reader.readLine().also { line = it } != null) {
+                            stderr.appendLine(line)
+                        }
                     }
                 }
-            }
-            stdoutReader.start()
-            stderrReader.start()
+                stdoutReader.start()
+                stderrReader.start()
 
-            val finished = proc.waitFor(timeout, java.util.concurrent.TimeUnit.MILLISECONDS)
-            if (!finished) {
-                proc.destroyForcibly()
-                return@withContext Shell.Result.Error("Command timed out after ${timeout}ms")
-            }
-            stdoutReader.join(1000)
-            stderrReader.join(1000)
+                val finished = proc.waitFor(timeout, java.util.concurrent.TimeUnit.MILLISECONDS)
+                if (!finished) {
+                    proc.destroyForcibly()
+                    return@withContext Shell.Result.Error("Command timed out after ${timeout}ms")
+                }
+                stdoutReader.join(1000)
+                stderrReader.join(1000)
 
-            val exitCode = proc.exitValue()
-            val output = stdout.toString().trim()
+                val exitCode = proc.exitValue()
+                val output = stdout.toString().trim()
 
-            if (exitCode == 0) {
-                Shell.Result.Success(output)
-            } else {
-                Shell.Result.Error(
-                    message = stderr.toString().trim().ifEmpty { output },
-                    exitCode = exitCode
-                )
+                if (exitCode == 0) {
+                    Shell.Result.Success(output)
+                } else {
+                    Shell.Result.Error(
+                        message = stderr.toString().trim().ifEmpty { output },
+                        exitCode = exitCode
+                    )
+                }
+            } catch (e: Exception) {
+                Shell.Result.Error(e.message ?: "Shizuku execution failed")
             }
-        } catch (e: Exception) {
-            Shell.Result.Error(e.message ?: "Shizuku execution failed")
         }
-    }
 
-    private fun newShizukuProcess(cmd: Array<String>): java.lang.Process {
+    /**
+     * Creates a new process via Shizuku using pure reflection.
+     *
+     * Shizuku.newProcess() is technically public at runtime but the Kotlin compiler
+     * sees it as private/inaccessible in the API stub — using getDeclaredMethod +
+     * setAccessible(true) bypasses the compile-time check while remaining safe at runtime.
+     * Compatible with Shizuku 10+ on Android 8–16.
+     */
+    private fun newShizukuProcess(cmd: Array<String>): Process {
         val method = Shizuku::class.java.getDeclaredMethod(
             "newProcess",
             Array<String>::class.java,
@@ -126,11 +136,11 @@ object ShizukuShell {
             String::class.java
         )
         method.isAccessible = true
-        return method.invoke(null, cmd, null, null) as java.lang.Process
+        return method.invoke(null, cmd, null, null) as Process
     }
 
     suspend fun isServiceRunning(): Boolean {
-        return when (execute("pgrep -f 'beta.manager.service.BetaService'")) {
+        return when (execute("pgrep -f 'beta.manager' 2>/dev/null | head -1")) {
             is Shell.Result.Success -> true
             is Shell.Result.Error -> false
         }

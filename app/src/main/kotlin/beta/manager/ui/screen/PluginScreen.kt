@@ -21,6 +21,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import beta.manager.ui.component.PluginCard
 import beta.manager.ui.theme.*
+import beta.manager.ui.viewmodel.FlashMode
 import beta.manager.ui.viewmodel.PluginViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -141,6 +142,42 @@ fun PluginScreen(
                             color = NeonCyan
                         )
                     }
+                }
+            }
+
+            // Flash Mode selector
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                FlashMode.entries.forEach { mode ->
+                    val isSelected = uiState.flashMode == mode
+                    val chipColor = when (mode) {
+                        FlashMode.BETA -> NeonCyan
+                        FlashMode.MAGISK -> NeonGreen
+                        FlashMode.KSU -> NeonPurple
+                        FlashMode.APATCH -> NeonYellow
+                        FlashMode.AXERON -> NeonPink
+                    }
+                    FilterChip(
+                        selected = isSelected,
+                        onClick = { viewModel.setFlashMode(mode) },
+                        label = { Text(mode.name, style = MaterialTheme.typography.labelSmall) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = chipColor.copy(alpha = 0.2f),
+                            selectedLabelColor = chipColor,
+                            containerColor = DarkCard,
+                            labelColor = TextTertiary
+                        ),
+                        border = FilterChipDefaults.filterChipBorder(
+                            enabled = true,
+                            selected = isSelected,
+                            selectedBorderColor = chipColor,
+                            borderColor = DarkSurfaceVariant
+                        )
+                    )
                 }
             }
 

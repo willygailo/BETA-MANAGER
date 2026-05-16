@@ -21,4 +21,8 @@ interface IBetaService {
     int getPluginCount();
     int getEnabledCount();
     String getModulePath();
+    String getMagiskVersion();
+    String getKernelSUVersion();
+    String getAPatchVersion();
+    String getAxeronVersion();
 }

@@ -73,8 +73,11 @@ fun SettingsScreen(
                 Spacer(Modifier.height(8.dp))
                 SettingsHeader("Root & Privilege")
             }
-            item { SettingsToggleCard("Shizuku Mode", "Use Shizuku for elevated shell access", settings.shizukuMode, Icons.Outlined.Security, NeonCyan) { viewModel.setShizukuMode(it) } }
-            item { SettingsToggleCard("Flash as Magisk Module", "Install plugins as Magisk/KSU modules", settings.flashModule, Icons.Outlined.Extension, NeonOrange) { viewModel.setFlashModule(it) } }
+            item { SettingsToggleCard("Shizuku Mode", "Use Shizuku for elevated shell (non-root)", settings.shizukuMode, Icons.Outlined.Security, NeonCyan) { viewModel.setShizukuMode(it) } }
+            item { SettingsToggleCard("Flash as Magisk Module", "Install plugins as Magisk modules", settings.flashModule, Icons.Outlined.Extension, NeonOrange) { viewModel.setFlashModule(it) } }
+            item { SettingsToggleCard("Magisk Module Mode", "Enable Magisk module management", settings.magiskModuleMode, Icons.Outlined.Extension, NeonGreen) { viewModel.setMagiskModuleMode(it) } }
+            item { SettingsToggleCard("KernelSU Module Mode", "Enable KernelSU module management", settings.ksuModuleMode, Icons.Outlined.Extension, NeonPurple) { viewModel.setKsuModuleMode(it) } }
+            item { SettingsToggleCard("Axeron Module Mode", "Enable Axeron Manager plugin support", settings.axeronModuleMode, Icons.Outlined.Extension, NeonPink) { viewModel.setAxeronModuleMode(it) } }
 
             item {
                 Spacer(Modifier.height(8.dp))
@@ -208,7 +211,7 @@ private fun AboutCard() {
                 color = TextPrimary
             )
             Text(
-                "v1.2.0",
+                "v1.3.0",
                 style = MaterialTheme.typography.bodyMedium,
                 color = NeonCyan
             )

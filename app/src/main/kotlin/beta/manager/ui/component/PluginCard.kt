@@ -40,12 +40,16 @@ fun PluginCard(
         PluginSource.AXMANAGER -> NeonOrange
         PluginSource.MAGISK -> NeonGreen
         PluginSource.KSU -> NeonPurple
+        PluginSource.APATCH -> NeonYellow
+        PluginSource.AXERON -> NeonPink
     }
     val sourceLabel = when (plugin.source) {
         PluginSource.BETA -> "BETA"
         PluginSource.AXMANAGER -> "AXRON"
         PluginSource.MAGISK -> "MAGISK"
         PluginSource.KSU -> "KSU"
+        PluginSource.APATCH -> "APATCH"
+        PluginSource.AXERON -> "AXERON"
     }
 
     Card(
@@ -191,13 +195,13 @@ fun PluginCard(
                     ) {
                         Icon(
                             Icons.Filled.Info, contentDescription = null,
-                            tint = if (showActionOutput.startsWith("Error") || showActionOutput.startsWith("Failed")) NeonRed else NeonGreen,
+                            tint = if (showActionOutput.startsWith("✗") || showActionOutput.startsWith("Error") || showActionOutput.startsWith("Failed")) NeonRed else NeonGreen,
                             modifier = Modifier.size(16.dp)
                         )
                         Text(
                             showActionOutput,
                             style = MaterialTheme.typography.bodySmall,
-                            color = if (showActionOutput.startsWith("Error") || showActionOutput.startsWith("Failed")) NeonRed else NeonGreen
+                            color = if (showActionOutput.startsWith("✗") || showActionOutput.startsWith("Error") || showActionOutput.startsWith("Failed")) NeonRed else NeonGreen
                         )
                     }
                 }

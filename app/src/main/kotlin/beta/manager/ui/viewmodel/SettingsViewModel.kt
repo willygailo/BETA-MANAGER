@@ -36,7 +36,8 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun setAutoStart(enabled: Boolean) {
         viewModelScope.launch {
             prefs.setAutoStart(enabled)
-            val bootPrefs = getApplication<android.app.Application>().getSharedPreferences("beta_boot_prefs", android.content.Context.MODE_PRIVATE)
+            val bootPrefs = getApplication<Application>()
+                .getSharedPreferences("beta_boot_prefs", android.content.Context.MODE_PRIVATE)
             bootPrefs.edit().putBoolean("auto_start", enabled).apply()
         }
     }
@@ -71,7 +72,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch {
             prefs.setGpuBoost(enabled)
             if (enabled) {
-                Shell.executeWithElevation("sh -c 'echo 1 > /sys/class/kgsl/kgsl-3d0/force_bus_on 2>/dev/null; echo 1 > /sys/class/kgsl/kgsl-3d0/force_clk_on 2>/dev/null; echo 1 > /sys/class/kgsl/kgsl-3d0/force_rail_on 2>/dev/null; echo 100 > /sys/class/kgsl/kgsl-3d0/devfreq/max_freq 2>/dev/null'")
+                Shell.executeWithElevation("sh -c 'echo 1 > /sys/class/kgsl/kgsl-3d0/force_bus_on 2>/dev/null; echo 1 > /sys/class/kgsl/kgsl-3d0/force_clk_on 2>/dev/null; echo 1 > /sys/class/kgsl/kgsl-3d0/force_rail_on 2>/dev/null'")
             } else {
                 Shell.executeWithElevation("sh -c 'echo 0 > /sys/class/kgsl/kgsl-3d0/force_bus_on 2>/dev/null; echo 0 > /sys/class/kgsl/kgsl-3d0/force_clk_on 2>/dev/null; echo 0 > /sys/class/kgsl/kgsl-3d0/force_rail_on 2>/dev/null'")
             }
@@ -86,7 +87,8 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch {
             prefs.setBusyboxMode(enabled)
             if (enabled) {
-                Shell.execute("export ASH_STANDALONE=1; \$(pgrep -f busybox | head -1) 2>/dev/null")
+                // Try to find and activate BusyBox in standalone mode
+                Shell.execute("ASH_STANDALONE=1 busybox sh -c 'echo BusyBox activated' 2>/dev/null || true")
             }
         }
     }
@@ -101,6 +103,10 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
     fun setKsuModuleMode(enabled: Boolean) {
         viewModelScope.launch { prefs.setKsuModuleMode(enabled) }
+    }
+
+    fun setAxeronModuleMode(enabled: Boolean) {
+        viewModelScope.launch { prefs.setAxeronModuleMode(enabled) }
     }
 
     fun setFlashModule(enabled: Boolean) {

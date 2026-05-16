@@ -229,4 +229,24 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             _uiState.value = _uiState.value.copy(isGameBoosted = !current, isBoosting = false)
         }
     }
+
+    fun toggleModule(id: String) {
+        viewModelScope.launch {
+            val plugin = _uiState.value.modules.find { it.id == id } ?: return@launch
+            try {
+                if (plugin.isEnabled) pluginManager.disable(id)
+                else pluginManager.enable(id)
+            } catch (_: Exception) {}
+            scanModules()
+        }
+    }
+
+    fun removeModule(id: String) {
+        viewModelScope.launch {
+            try {
+                pluginManager.markForRemoval(id)
+            } catch (_: Exception) {}
+            scanModules()
+        }
+    }
 }

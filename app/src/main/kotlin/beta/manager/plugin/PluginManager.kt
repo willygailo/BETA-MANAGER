@@ -4,7 +4,7 @@ import beta.manager.utils.Shell
 import kotlinx.coroutines.runBlocking
 import java.io.File
 
-enum class PluginSource { BETA, AXMANAGER, MAGISK, KSU }
+enum class PluginSource { BETA, AXMANAGER, MAGISK, KSU, APATCH, AXERON }
 
 data class PluginInfo(
     val id: String,
@@ -32,10 +32,12 @@ data class UpdateInfo(
 class PluginManager(private val pluginsDir: String) {
 
     companion object {
-        const val SERVER_VERSION = 10001
+        const val SERVER_VERSION = 10004
         private val AXMANAGER_PLUGINS_DIR = "/data/user_de/0/com.android.shell/axeron/plugins/"
         private val MAGISK_MODULES_DIR = "/data/adb/modules/"
         private val KSU_MODULES_DIR = "/data/adb/ksu/modules/"
+        private val APATCH_MODULES_DIR = "/data/adb/apatch/modules/"
+        private val AXERON_MODULES_DIR = "/data/adb/axeron/modules/"
     }
 
     private val plugins = mutableMapOf<String, PluginInfo>()
@@ -48,6 +50,8 @@ class PluginManager(private val pluginsDir: String) {
         scanSingleDir(AXMANAGER_PLUGINS_DIR, PluginSource.AXMANAGER)
         scanModulesDir(MAGISK_MODULES_DIR, PluginSource.MAGISK)
         scanModulesDir(KSU_MODULES_DIR, PluginSource.KSU)
+        scanModulesDir(APATCH_MODULES_DIR, PluginSource.APATCH)
+        scanModulesDir(AXERON_MODULES_DIR, PluginSource.AXERON)
         return plugins.values.toList()
     }
 
@@ -184,7 +188,7 @@ class PluginManager(private val pluginsDir: String) {
 
     fun cleanAllMarked(): Int {
         var cleaned = 0
-        val dirs = listOf(pluginsDir, AXMANAGER_PLUGINS_DIR, MAGISK_MODULES_DIR, KSU_MODULES_DIR)
+        val dirs = listOf(pluginsDir, AXMANAGER_PLUGINS_DIR, MAGISK_MODULES_DIR, KSU_MODULES_DIR, APATCH_MODULES_DIR, AXERON_MODULES_DIR)
         for (dirPath in dirs) {
             val dir = File(dirPath)
             if (dir.exists() && dir.canRead()) {
@@ -275,7 +279,9 @@ class PluginManager(private val pluginsDir: String) {
             File(pluginsDir, id),
             File(AXMANAGER_PLUGINS_DIR, id),
             File(MAGISK_MODULES_DIR, id),
-            File(KSU_MODULES_DIR, id)
+            File(KSU_MODULES_DIR, id),
+            File(APATCH_MODULES_DIR, id),
+            File(AXERON_MODULES_DIR, id)
         )
         return candidates.firstOrNull { it.exists() }?.absolutePath
     }

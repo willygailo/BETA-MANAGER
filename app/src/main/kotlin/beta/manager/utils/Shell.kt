@@ -6,7 +6,7 @@ import java.io.BufferedReader
 import java.io.InputStreamReader
 
 enum class RootType {
-    MAGISK, KERNELSU, APATCH, SU, NONE, SHIZUKU
+    MAGISK, KERNELSU, APATCH, AXERON, SU, NONE, SHIZUKU
 }
 
 object Shell {
@@ -20,7 +20,7 @@ object Shell {
 
     fun setDebugMode(enabled: Boolean) { debugMode = enabled }
 
-    fun quote(value: String): String = "'${value.replace("'", "'\"'\"'")}'"
+    fun quote(value: String): String = "'${value.replace("'", "'\\''")}'"
 
     suspend fun executeWithElevation(command: String, timeout: Long = 30000L): Result {
         if (isRootAvailable()) {
@@ -102,8 +102,9 @@ object Shell {
     }
 
     suspend fun isRootAvailable(): Boolean = withContext(Dispatchers.IO) {
+        // First try: check if su binary exists and responds
         try {
-            val process = ProcessBuilder("su", "-c", "echo root").start()
+            val process = ProcessBuilder("su", "-c", "id").start()
             process.outputStream.close()
             val reader = BufferedReader(InputStreamReader(process.inputStream))
             val line = reader.readLine()
@@ -112,10 +113,16 @@ object Shell {
                 process.destroyForcibly()
                 return@withContext false
             }
-            line == "root" && process.exitValue() == 0
-        } catch (e: Exception) {
-            false
-        }
+            return@withContext line != null && (line.contains("uid=0") || line.contains("root")) && process.exitValue() == 0
+        } catch (_: Exception) {}
+        // Fallback: which su
+        try {
+            val p = ProcessBuilder("which", "su").start()
+            val line = BufferedReader(InputStreamReader(p.inputStream)).readLine()
+            p.waitFor(2, java.util.concurrent.TimeUnit.SECONDS)
+            return@withContext !line.isNullOrBlank()
+        } catch (_: Exception) {}
+        false
     }
 
     suspend fun detectRootType(): RootType = withContext(Dispatchers.IO) {
@@ -123,6 +130,7 @@ object Shell {
             checkMagisk() -> RootType.MAGISK
             checkKernelSU() -> RootType.KERNELSU
             checkAPatch() -> RootType.APATCH
+            checkAxeron() -> RootType.AXERON
             isRootAvailable() -> RootType.SU
             ShizukuShell.hasPermission() -> RootType.SHIZUKU
             else -> RootType.NONE
@@ -130,43 +138,81 @@ object Shell {
     }
 
     private suspend fun checkMagisk(): Boolean {
-        return when (execute("magisk -v 2>/dev/null")) {
-            is Result.Success -> true
-            is Result.Error -> false
-        }
+        // Try magisk binary
+        val byBinary = execute("magisk --version 2>/dev/null || magisk -v 2>/dev/null")
+        if (byBinary is Result.Success && byBinary.output.isNotBlank()) return true
+        // Try checking magisk daemon socket
+        val bySocket = execute("[ -S /dev/.magisk.unblock ] && echo ok 2>/dev/null")
+        if (bySocket is Result.Success && bySocket.output.trim() == "ok") return true
+        // Try /proc/net/unix
+        val byProc = execute("grep -q magisk /proc/net/unix 2>/dev/null && echo ok")
+        return byProc is Result.Success && byProc.output.trim() == "ok"
     }
 
     private suspend fun checkKernelSU(): Boolean {
-        return when (execute("ksud --version 2>/dev/null")) {
-            is Result.Success -> true
-            is Result.Error -> false
-        }
+        // Try ksud binary
+        val byBinary = execute("ksud --version 2>/dev/null || ksud version 2>/dev/null")
+        if (byBinary is Result.Success && byBinary.output.isNotBlank()) return true
+        // Try KernelSU kernel property
+        val byProp = execute("getprop sys.kernelsu.version 2>/dev/null || getprop ro.kernelsu.version 2>/dev/null")
+        if (byProp is Result.Success && byProp.output.isNotBlank()) return true
+        // Check for KernelSU manager package
+        val byPkg = execute("pm list packages 2>/dev/null | grep -q 'me.weishu.kernelsu\\|com.kernelsu' && echo ok")
+        return byPkg is Result.Success && byPkg.output.trim() == "ok"
     }
 
     private suspend fun checkAPatch(): Boolean {
-        return when (execute("apd --version 2>/dev/null")) {
-            is Result.Success -> true
-            is Result.Error -> false
-        }
+        val byBinary = execute("apd --version 2>/dev/null || apd version 2>/dev/null")
+        if (byBinary is Result.Success && byBinary.output.isNotBlank()) return true
+        val byProp = execute("getprop ro.apatch.version 2>/dev/null")
+        return byProp is Result.Success && byProp.output.isNotBlank()
+    }
+
+    private suspend fun checkAxeron(): Boolean {
+        // Axeron Manager (AxeronManager) uses its own daemon
+        val byProp = execute("getprop ro.axeron.version 2>/dev/null")
+        if (byProp is Result.Success && byProp.output.isNotBlank()) return true
+        val byPath = execute("[ -d /data/adb/axeron ] && echo ok 2>/dev/null")
+        if (byPath is Result.Success && byPath.output.trim() == "ok") return true
+        val byPkg = execute("pm list packages 2>/dev/null | grep -q 'com.axeron.manager\\|io.axeron' && echo ok")
+        return byPkg is Result.Success && byPkg.output.trim() == "ok"
     }
 
     suspend fun getMagiskVersion(): String = withContext(Dispatchers.IO) {
-        when (val res = execute("magisk -v 2>/dev/null")) {
-            is Result.Success -> res.output
+        when (val res = execute("magisk --version 2>/dev/null || magisk -v 2>/dev/null")) {
+            is Result.Success -> res.output.lines().firstOrNull { it.isNotBlank() } ?: "N/A"
             is Result.Error -> "N/A"
         }
     }
 
     suspend fun getKernelSUVersion(): String = withContext(Dispatchers.IO) {
-        when (val res = execute("ksud --version 2>/dev/null")) {
-            is Result.Success -> res.output
+        val byBin = execute("ksud --version 2>/dev/null")
+        if (byBin is Result.Success && byBin.output.isNotBlank()) return@withContext byBin.output.lines().firstOrNull { it.isNotBlank() } ?: "N/A"
+        when (val res = execute("getprop sys.kernelsu.version 2>/dev/null || getprop ro.kernelsu.version 2>/dev/null")) {
+            is Result.Success -> res.output.lines().firstOrNull { it.isNotBlank() } ?: "N/A"
+            is Result.Error -> "N/A"
+        }
+    }
+
+    suspend fun getAPatchVersion(): String = withContext(Dispatchers.IO) {
+        val byBin = execute("apd --version 2>/dev/null")
+        if (byBin is Result.Success && byBin.output.isNotBlank()) return@withContext byBin.output.lines().firstOrNull { it.isNotBlank() } ?: "N/A"
+        when (val res = execute("getprop ro.apatch.version 2>/dev/null")) {
+            is Result.Success -> res.output.lines().firstOrNull { it.isNotBlank() } ?: "N/A"
+            is Result.Error -> "N/A"
+        }
+    }
+
+    suspend fun getAxeronVersion(): String = withContext(Dispatchers.IO) {
+        when (val res = execute("getprop ro.axeron.version 2>/dev/null")) {
+            is Result.Success -> res.output.lines().firstOrNull { it.isNotBlank() } ?: "N/A"
             is Result.Error -> "N/A"
         }
     }
 
     suspend fun getSuVersion(): String = withContext(Dispatchers.IO) {
         when (val res = execute("su --version 2>/dev/null || echo legacy")) {
-            is Result.Success -> res.output
+            is Result.Success -> res.output.lines().firstOrNull { it.isNotBlank() } ?: "N/A"
             is Result.Error -> "N/A"
         }
     }
@@ -193,15 +239,17 @@ object Shell {
 
     suspend fun hasSELinuxEnforce(): Boolean = withContext(Dispatchers.IO) {
         when (val res = execute("getenforce 2>/dev/null")) {
-            is Result.Success -> res.output == "Enforcing"
+            is Result.Success -> res.output.trim().equals("Enforcing", ignoreCase = true)
             is Result.Error -> true
         }
     }
 
     suspend fun getDebugInfo(): String = withContext(Dispatchers.IO) {
+        val rootType = detectRootType()
         buildString {
             appendLine("=== Beta Manager Debug Info ===")
-            appendLine("Root: ${detectRootType().name}")
+            appendLine("Version: 1.3.0 (10004)")
+            appendLine("Root: ${rootType.name}")
             appendLine("ADB Shell: ${isAdbShell()}")
             appendLine("SELinux: ${if (hasSELinuxEnforce()) "Enforcing" else "Permissive"}")
             appendLine("Shizuku: ${isShizukuAvailable()}")
@@ -209,13 +257,24 @@ object Shell {
             appendLine("API: ${android.os.Build.VERSION.SDK_INT}")
             appendLine("Device: ${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}")
             appendLine("Android: ${android.os.Build.VERSION.RELEASE}")
-            when (val magisk = getMagiskVersion()) {
-                "N/A" -> {}
-                else -> appendLine("Magisk: $magisk")
-            }
-            when (val ksu = getKernelSUVersion()) {
-                "N/A" -> {}
-                else -> appendLine("KernelSU: $ksu")
+            when (rootType) {
+                RootType.MAGISK -> {
+                    val v = getMagiskVersion()
+                    if (v != "N/A") appendLine("Magisk: $v")
+                }
+                RootType.KERNELSU -> {
+                    val v = getKernelSUVersion()
+                    if (v != "N/A") appendLine("KernelSU: $v")
+                }
+                RootType.APATCH -> {
+                    val v = getAPatchVersion()
+                    if (v != "N/A") appendLine("APatch: $v")
+                }
+                RootType.AXERON -> {
+                    val v = getAxeronVersion()
+                    if (v != "N/A") appendLine("Axeron: $v")
+                }
+                else -> {}
             }
         }
     }

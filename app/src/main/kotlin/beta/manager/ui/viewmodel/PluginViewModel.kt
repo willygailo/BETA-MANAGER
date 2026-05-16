@@ -23,7 +23,7 @@ data class PluginUiState(
     val flashMode: FlashMode = FlashMode.BETA
 )
 
-enum class FlashMode { BETA, MAGISK, KSU }
+enum class FlashMode { BETA, MAGISK, KSU, APATCH, AXERON }
 
 class PluginViewModel : ViewModel() {
 
@@ -91,8 +91,10 @@ class PluginViewModel : ViewModel() {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(actionOutput = "Running action...")
             try {
-                pluginManager.runAction(id)
-                _uiState.value = _uiState.value.copy(actionOutput = "Action completed")
+                val success = pluginManager.runAction(id)
+                _uiState.value = _uiState.value.copy(
+                    actionOutput = if (success) "✓ Action completed successfully" else "✗ Action failed or not available"
+                )
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(actionOutput = "Action failed: ${e.message}")
             }
@@ -105,18 +107,35 @@ class PluginViewModel : ViewModel() {
             try {
                 val mode = _uiState.value.flashMode
                 val result = when (mode) {
-                    FlashMode.BETA -> pluginInstaller.install(zipPath)
-                    FlashMode.MAGISK -> pluginInstaller.installToMagisk(zipPath).success
-                    FlashMode.KSU -> pluginInstaller.installToKSU(zipPath).success
+                    FlashMode.BETA -> {
+                        val success = pluginInstaller.install(zipPath)
+                        Pair(success, if (success) "Plugin installed successfully" else "Installation failed")
+                    }
+                    FlashMode.MAGISK -> {
+                        val r = pluginInstaller.installToMagisk(zipPath)
+                        Pair(r.success, r.message)
+                    }
+                    FlashMode.KSU -> {
+                        val r = pluginInstaller.installToKSU(zipPath)
+                        Pair(r.success, r.message)
+                    }
+                    FlashMode.APATCH -> {
+                        val r = pluginInstaller.installToAPatch(zipPath)
+                        Pair(r.success, r.message)
+                    }
+                    FlashMode.AXERON -> {
+                        val r = pluginInstaller.installToAxeron(zipPath)
+                        Pair(r.success, r.message)
+                    }
                 }
                 _uiState.value = _uiState.value.copy(
                     isInstalling = false,
-                    installResult = if (result) "Module installed successfully" else "Installation failed"
+                    installResult = "${if (result.first) "✓" else "✗"} ${result.second}"
                 )
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isInstalling = false,
-                    installResult = "Error: ${e.message}"
+                    installResult = "✗ Error: ${e.message}"
                 )
             }
             loadPlugins()
@@ -133,12 +152,12 @@ class PluginViewModel : ViewModel() {
                 val pending = updates.count { it.needsUpdate }
                 _uiState.value = _uiState.value.copy(
                     isFixing = false,
-                    fixResult = "Fixed $fixed plugins, $pending updates available"
+                    fixResult = "✓ Fixed $fixed plugins, $pending updates available"
                 )
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isFixing = false,
-                    fixResult = "Fix failed: ${e.message}"
+                    fixResult = "✗ Fix failed: ${e.message}"
                 )
             }
             loadPlugins()

@@ -22,7 +22,7 @@ class BetaService : Service() {
 
     companion object {
         const val TAG = "BetaService"
-        const val SERVER_VERSION = 10002
+        const val SERVER_VERSION = 10004
         const val NOTIFICATION_ID = 1001
         const val CHANNEL_ID = "beta_service_channel"
 
@@ -218,6 +218,34 @@ class BetaService : Service() {
         }
 
         override fun getModulePath(): String = PLUGINS_DIR
+
+        override fun getMagiskVersion(): String {
+            var result = "N/A"
+            val job = serviceScope.launch { result = Shell.getMagiskVersion() }
+            try { kotlinx.coroutines.runBlocking { job.join() } } catch (_: Exception) {}
+            return result
+        }
+
+        override fun getKernelSUVersion(): String {
+            var result = "N/A"
+            val job = serviceScope.launch { result = Shell.getKernelSUVersion() }
+            try { kotlinx.coroutines.runBlocking { job.join() } } catch (_: Exception) {}
+            return result
+        }
+
+        override fun getAPatchVersion(): String {
+            var result = "N/A"
+            val job = serviceScope.launch { result = Shell.getAPatchVersion() }
+            try { kotlinx.coroutines.runBlocking { job.join() } } catch (_: Exception) {}
+            return result
+        }
+
+        override fun getAxeronVersion(): String {
+            var result = "N/A"
+            val job = serviceScope.launch { result = Shell.getAxeronVersion() }
+            try { kotlinx.coroutines.runBlocking { job.join() } } catch (_: Exception) {}
+            return result
+        }
     }
 
     override fun onBind(intent: Intent?): IBinder = binder

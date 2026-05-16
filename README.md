@@ -2,14 +2,16 @@
   <br>
   <h1>⚡ BETA MANAGER</h1>
   <p><strong>Universal Module Manager for Android</strong></p>
-  <p>Flash ZIP modules · Root + Non-rooted · Magisk/KSU/Axeron Compatible</p>
+  <p>Flash ZIP modules · Root + Non-rooted · Magisk / KSU / APatch / Axeron Compatible</p>
   <br>
   <p>
+    <img src="https://img.shields.io/badge/Version-1.3.0-00E5FF?style=for-the-badge" alt="Version">
     <img src="https://img.shields.io/badge/Kotlin-2.1.0-7F52FF?style=for-the-badge&logo=kotlin&logoColor=white" alt="Kotlin">
     <img src="https://img.shields.io/badge/Compose-BOM_2024.12-4285F4?style=for-the-badge&logo=jetpackcompose&logoColor=white" alt="Compose">
-    <img src="https://img.shields.io/badge/minSdk-26-00E676?style=for-the-badge&logo=android&logoColor=white" alt="minSdk">
-    <img src="https://img.shields.io/badge/Shizuku-13.1.5-8B5CF6?style=for-the-badge&logo=shizuku&logoColor=white" alt="Shizuku">
-    <img src="https://img.shields.io/badge/Root-SU_|_Magisk_|_KSU-00E676?style=for-the-badge&logo=android&logoColor=white" alt="Root">
+    <img src="https://img.shields.io/badge/minSdk-26_(Android_8)-00E676?style=for-the-badge&logo=android&logoColor=white" alt="minSdk">
+    <img src="https://img.shields.io/badge/targetSdk-35_(Android_15)-00E676?style=for-the-badge&logo=android&logoColor=white" alt="targetSdk">
+    <img src="https://img.shields.io/badge/Shizuku-13.1.5-8B5CF6?style=for-the-badge" alt="Shizuku">
+    <img src="https://img.shields.io/badge/Root-Magisk_|_KSU_|_APatch_|_Axeron-00E676?style=for-the-badge" alt="Root">
   </p>
   <br>
 </div>
@@ -50,22 +52,22 @@
 
 | Feature | Description |
 |---------|-------------|
-| 🧩 **Module System** | Flash ZIP plugins/modules like Magisk/KernelSU — **root or Shizuku** |
-| 🤖 **Auto Activation** | Auto-detect: Root→`su`, Non-root→**Shizuku**. One tap activation |
-| 📦 **Module Dashboard** | Magisk/KSU-style module list with source badges (BETA/AXRON/MAGISK/KSU) |
-| 🔍 **Deep Module Scan** | Scans Beta, AxManager, Magisk, and KernelSU module directories |
-| 🎮 **Game Profiles** | Per-app performance profile for MLBB, COD Mobile, PUBG, Genshin, at iba pa |
-| 🌐 **WebUI Support** | KernelSU-compatible JavaScript bridge (`ksu.exec`, `ksu.toast`) |
+| 🧩 **Module System** | Flash ZIP plugins/modules — **root or Shizuku**, 5 flash targets |
+| 🤖 **Auto Detection** | Auto-detect: Magisk → KSU → APatch → Axeron → Shizuku → ADB |
+| 📦 **Module Dashboard** | Module list with source badges: BETA / AXRON / MAGISK / KSU / APATCH / AXERON |
+| 🔍 **Deep Module Scan** | Scans **6 directories**: Beta, AxManager, Magisk, KSU, APatch, Axeron |
+| 🎮 **Game Profiles** | Per-app performance profile — 22 games supported (MLBB, PUBG, BGMI, COD, HoK, Genshin, etc.) |
+| 🌐 **WebUI Support** | KernelSU-compatible JS bridge (`ksu.exec`, `ksu.toast`) |
 | 🖥️ **Shell Executor** | Interactive terminal via AIDL-backed BetaService |
 | 📋 **Service Logs** | View BetaService logs like Magisk Log |
-| 🛡️ **Superuser Page** | List installed apps — shows root status (rooted devices) |
+| 🛡️ **Superuser Page** | List installed apps — shows root status |
 | 🧹 **Clean All** | Remove all modules marked for deletion in one tap |
-| ⚡ **Boot Automation** | Auto-start service on boot (configurable) |
-| 🎨 **Cyberpunk Theme** | Neon cyan/pink/purple gaming aesthetic UI |
+| ⚡ **Boot Automation** | Auto-start service on boot, LOCKED_BOOT_COMPLETED aware |
+| 🎨 **Cyberpunk Theme** | Neon cyan/pink/purple/yellow gaming aesthetic UI |
 | 🚨 **Crash Handling** | Global exception handler + crash report screen |
 | 💾 **DataStore Settings** | Persistent toggles that survive app restarts |
-| 🔄 **AxManager Compatible** | Supports `betaPlugin` + `axeronPlugin` format, scans AxManager dir |
 | ⚡ **Game Boost** | One-tap CPU governor, GPU boost, memory optimization |
+| 🔧 **Version Info** | Query Magisk / KSU / APatch / Axeron version via AIDL |
 
 </div>
 
@@ -75,16 +77,16 @@
 
 <div align="center">
 
-| Screen | Preview | Description |
-|--------|---------|-------------|
-| 🏠 **Home Dashboard** | | Service status, module list with source badges, 6 quick action chips (Install/Clean/Shell/Boost/Logs/SU) |
-| 📦 **Plugins** | | Detailed module cards with Action, WebUI, Info, Remove buttons + detail dialog |
-| 🎯 **Game Profiles** | | Per-game performance profiles. Auto-detect installed games |
-| ⚙️ **Settings** | | Gaming mode, auto-start, thermal, CPU governor, GPU boost, debug — **all elevated** |
-| 🖥️ **Shell** | | Interactive terminal with command history, AIDL-connected to BetaService |
-| 🌐 **WebUI** | | WebView loading plugin `webroot/index.html` with `ksu.exec` JS bridge |
-| 📋 **Logs** | | Service log viewer — like Magisk Log |
-| 🛡️ **Superuser** | | App list with root detection (rooted only) |
+| Screen | Description |
+|--------|-------------|
+| 🏠 **Home Dashboard** | Service status, module list with 6-source badges, quick action chips |
+| 📦 **Plugins** | Module cards with FlashMode chip selector (BETA/MAGISK/KSU/APATCH/AXERON), Action, WebUI, Remove |
+| 🎯 **Game Profiles** | 22 games auto-detected, toggle → applies tweaks immediately |
+| ⚙️ **Settings** | Gaming mode, Shizuku, Magisk/KSU/Axeron module mode, Thermal, CPU, GPU, Debug |
+| 🖥️ **Shell** | Interactive terminal, command history, AIDL-connected |
+| 🌐 **WebUI** | WebView loading plugin `webroot/index.html` with `ksu.exec` JS bridge |
+| 📋 **Logs** | Service log viewer |
+| 🛡️ **Superuser** | App list with root detection |
 
 </div>
 
@@ -100,12 +102,10 @@
 │                                                                  │
 │  ┌─────────────────────────────────────────────────────────┐    │
 │  │                  UI LAYER (COMPOSE)                      │    │
-│  │                                                          │    │
 │  │   MainActivity ──► NavGraph                              │    │
-│  │       │                                                  │    │
-│  │       ├── 🏠 HomeDashboard (module list + status)        │    │
-│  │       ├── 📦 PluginScreen (module detail manager)        │    │
-│  │       ├── 🎯 GameProfilesScreen                          │    │
+│  │       ├── 🏠 HomeScreen (module list + status)           │    │
+│  │       ├── 📦 PluginScreen (FlashMode chip + cards)       │    │
+│  │       ├── 🎯 GameProfilesScreen (22 games)               │    │
 │  │       ├── ⚙️ SettingsScreen                              │    │
 │  │       ├── 🖥️ ShellExecutorScreen                         │    │
 │  │       ├── 🌐 WebUIScreen                                 │    │
@@ -114,60 +114,53 @@
 │  └──────────────────┬──────────────────────────────────────┘    │
 │                     │ observes                                   │
 │  ┌──────────────────▼──────────────────────────────────────┐    │
-│  │               VIEWMODEL LAYER                           │    │
-│  │  (HomeViewModel · PluginViewModel · SettingsViewModel    │    │
-│  │   GameProfilesViewModel · StateFlow + Coroutines)       │    │
+│  │               VIEWMODEL LAYER                            │    │
+│  │  HomeViewModel · PluginViewModel · SettingsViewModel     │    │
+│  │  GameProfilesViewModel · StateFlow + Coroutines          │    │
 │  └──────────────────┬──────────────────────────────────────┘    │
-│                     │ calls                                     │
+│                     │ calls                                      │
 │  ┌──────────────────▼──────────────────────────────────────┐    │
-│  │              SERVICE / LOGIC LAYER                      │    │
-│  │                                                          │    │
+│  │              SERVICE / LOGIC LAYER                       │    │
 │  │   🖥️ BetaService  ◄────── (AIDL IPC)                    │    │
-│  │   📡 AdbClient / AdbActivator (multi-mode activation)    │    │
-│  │   📦 PluginManager (deep scan Beta/Axeron/Magisk/KSU)   │    │
-│  │   📥 PluginInstaller (ZIP flash + Magisk/KSU support)   │    │
-│  │   ⌨️ Shell (command execution)                          │    │
-│  │   🔑 ShizukuShell (Shizuku-privileged execution)        │    │
-│  │   💾 PreferencesManager (DataStore persistence)          │    │
-│  │   🚨 CrashReportActivity (global exception handler)      │    │
+│  │   📡 AdbClient / AdbActivator (multi-mode)               │    │
+│  │   📦 PluginManager (6-dir scan)                          │    │
+│  │   📥 PluginInstaller (5 flash targets)                   │    │
+│  │   ⌨️ Shell (Magisk/KSU/APatch/Axeron/SU detection)       │    │
+│  │   🔑 ShizukuShell (public API + reflection fallback)     │    │
+│  │   💾 PreferencesManager (DataStore)                      │    │
 │  └─────────────────────────────────────────────────────────┘    │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
 </div>
 
-### 🔑 Dual Elevation Model
+### 🔑 Privilege Detection Hierarchy
 
 <div align="center">
 
 ```
-         ┌──────────────────────────┐
-         │   📱 Device Detection    │
-         └────────────┬─────────────┘
-                      │
-              ┌───────┴───────┐
-              ▼               ▼
-   ╔════════════════╗  ╔════════════════╗
-   ║   ROOTED      ║  ║  NON-ROOTED   ║
-   ║               ║  ║                ║
-   ║  su -c cmd    ║  ║  Shizuku API  ║
-   ║  Magisk/KSU   ║  ║  shell-level   ║
-   ║  Full access  ║  ║  privileges    ║
-   ╚════════════════╝  ╚════════════════╝
-              │               │
-              └───────┬───────┘
-                      ▼
-         ┌──────────────────────┐
-         │ ✅ Shell.executeWith │
-         │   Elevation()        │
-         │   Auto-routes to     │
-         │   correct backend    │
-         └──────────────────────┘
+📱 Device boot / App launch
+         │
+         ▼
+🔍 AUTO-DETECT (in order)
+         │
+    ┌────┴──────────────────────────────┐
+    ▼                                   ▼
+⚡ ROOTED                        🔑 NON-ROOTED
+    │                                   │
+    ├── 🟢 Magisk (magisk --version)    └── 🟣 Shizuku
+    ├── 🔵 KernelSU (ksud / sys prop)
+    ├── 🟡 APatch (apd / ro.apatch.*)
+    └── 🟠 Axeron Manager
+         │
+         ▼
+  Shell.executeWithElevation()
+  (auto-routes to correct backend)
 ```
 
 </div>
 
-### 🚀 End-to-End Flow
+### 🔍 End-to-End Flow
 
 <div align="center">
 
@@ -175,28 +168,28 @@
 📱 User installs APK
         │
         ▼
-🤖 AUTO-DETECT mode
-        │
-        ├── ⚡ Root detected ──► su -c start BetaService
-        ├── 🔑 Shizuku detected ──► Shizuku.newProcess → start service
-        └── 📡 No privilege ──► Show activation options (Wireless/ADB/TCP)
+🤖 AUTO-DETECT privilege
+        ├── 🟢 Magisk  ──► su -c start BetaService
+        ├── 🔵 KSU     ──► su -c start BetaService
+        ├── 🟡 APatch  ──► su -c start BetaService
+        ├── 🟠 Axeron  ──► su -c start BetaService
+        ├── 🟣 Shizuku ──► Shizuku.newProcess → start service
+        └── 📡 None    ──► Show ADB/Wireless options
         │
         ▼
 🖥️  BetaService starts
-  (com.android.shell — shell-level permissions)
         │
         ▼
-🔍 Deep scan modules
-  ├── 📁 Beta plugins dir
-  ├── 📁 AxManager plugins dir
-  ├── 📁 Magisk modules dir
-  └── 📁 KernelSU modules dir
+🔍 Deep scan (6 sources):
+   ├── 📁 Beta plugins dir          [BETA]
+   ├── 📁 AxManager plugins dir     [AXRON]
+   ├── 📁 Magisk modules            [MAGISK]
+   ├── 📁 KernelSU modules          [KSU]
+   ├── 📁 APatch modules            [APATCH]
+   └── 📁 Axeron modules            [AXERON]
         │
         ▼
-▶️  Run per enabled plugin: post-fs-data.sh → service.sh
-        │
-        ▼
-✅  System ready! Dashboard loaded.
+✅  Dashboard loaded!
 ```
 
 </div>
@@ -205,45 +198,38 @@
 
 ## 📁 RUNTIME DIRECTORY
 
-After activation, Beta Manager creates a working directory:
-
-<div align="center">
-
 ```
 📂 /data/user_de/0/com.android.shell/beta/
 │
 ├── 📁 bin/
-│   └── 📄 busybox              ← BusyBox (standalone mode)
+│   └── busybox                   ← BusyBox standalone
 │
-├── 📁 plugins/                  ← All installed Beta/Axron plugins
-│   │
-│   └── 📁 <module_id>/         ← Each plugin folder
-│       ├── 📄 module.prop      ← 📌 REQUIRED — plugin identity
-│       ├── 📄 service.sh       ← ⚡ Late start service script
-│       ├── 📄 post-fs-data.sh  ← 🔄 Early boot script
-│       ├── 📄 action.sh        ← 🎯 On-demand action button
-│       ├── 📄 uninstall.sh     ← 🗑️ Cleanup on remove
-│       ├── 📄 system.prop      ← 🐛 Debug setprop values
-│       ├── 📄 disable          ← 🚫 Flag: plugin OFF if present
-│       ├── 📄 remove           ← ❌ Flag: will delete next boot
-│       ├── 📁 system/
-│       │   └── 📁 bin/         ← Added to system PATH
-│       └── 📁 webroot/
-│           └── 📄 index.html   ← 🌐 WebUI (KernelSU API)
+├── 📁 plugins/                   ← Beta/AxManager plugins
+│   └── 📁 <module_id>/
+│       ├── module.prop           ← REQUIRED — identity
+│       ├── service.sh            ← Late start daemon
+│       ├── post-fs-data.sh       ← Early boot script
+│       ├── action.sh             ← On-demand action
+│       ├── uninstall.sh          ← Cleanup on remove
+│       ├── system.prop           ← setprop values
+│       ├── disable               ← Flag: plugin OFF
+│       ├── remove                ← Flag: delete next boot
+│       ├── 📁 system/bin/        ← Added to PATH
+│       └── 📁 webroot/index.html ← WebUI
 │
-└── 📁 logs/                     ← Service logs (viewable in-app)
+└── 📁 logs/                      ← Service logs
 ```
 
-</div>
+### 📂 All 6 Scanned Directories
 
-### 📂 Additional scanned directories:
-
-| Directory | Source | Badge |
-|-----------|--------|-------|
-| `/data/user_de/0/com.android.shell/beta/plugins/` | Beta Manager | `BETA` |
-| `/data/user_de/0/com.android.shell/axeron/plugins/` | AxManager | `AXRON` |
-| `/data/adb/modules/` | Magisk | `MAGISK` |
-| `/data/adb/ksu/modules/` | KernelSU | `KSU` |
+| Directory | Source | Badge | Color |
+|-----------|--------|-------|-------|
+| `/data/user_de/0/com.android.shell/beta/plugins/` | Beta Manager | `BETA` | 🩵 Cyan |
+| `/data/user_de/0/com.android.shell/axeron/plugins/` | AxManager | `AXRON` | 🟠 Orange |
+| `/data/adb/modules/` | Magisk | `MAGISK` | 🟢 Green |
+| `/data/adb/ksu/modules/` | KernelSU | `KSU` | 🟣 Purple |
+| `/data/adb/apatch/modules/` | APatch | `APATCH` | 🟡 Yellow |
+| `/data/adb/axeron/modules/` | Axeron Manager | `AXERON` | 🩷 Pink |
 
 ---
 
@@ -251,24 +237,19 @@ After activation, Beta Manager creates a working directory:
 
 ### 📦 ZIP Structure
 
-<div align="center">
-
 ```
 my_perf_module.zip
 │
-├── 📄 module.prop         ← 📌 REQUIRED — identity metadata
-├── 📄 customize.sh        ← 🛠️ Optional install script
-├── 📄 service.sh          ← ⚡ Late start background daemon
-├── 📄 post-fs-data.sh     ← 🔄 Early boot system patcher
-├── 📄 action.sh           ← 🎯 On-demand interactive action
-├── 📄 uninstall.sh        ← 🗑️ Cleanup on removal
-├── 📁 system/
-│   └── 📁 bin/             ← Binaries added to PATH
+├── module.prop         ← REQUIRED
+├── customize.sh        ← Optional — install script
+├── service.sh          ← Optional — background daemon
+├── post-fs-data.sh     ← Optional — early boot
+├── action.sh           ← Optional — on-demand action
+├── uninstall.sh        ← Optional — cleanup
+├── 📁 system/bin/      ← Optional — binaries added to PATH
 └── 📁 webroot/
-    └── 📄 index.html      ← 🌐 WebUI page
+    └── index.html      ← Optional — WebUI
 ```
-
-</div>
 
 ### 📝 module.prop Format
 
@@ -279,43 +260,61 @@ version=v2.0.0
 versionCode=2
 author=Willy Jr. C. Gailo
 description=CPU governor tweaks, GPU boost, memory optimization
-betaPlugin=10001
-axeronPlugin=10001
+betaPlugin=10004
+axeronPlugin=10004
 ```
 
-> **🔄 AxManager Compatible:** Pwedeng gumamit ng `axeronPlugin` imbes na `betaPlugin`.  
-> Auto-detect ng Beta Manager kung alin ang present.
+### 🎯 Flash Targets (5 options)
 
-### 🎯 Sample Plugin
-
-Nasa repo na ang sample plugin: [`cpu boost/`](cpu%20boost/)
-
-```bash
-cd "cpu boost"
-chmod +x *.sh
-./build.sh     # creates cpu_boost_v2.0.0.zip
-```
+| Target | Path | Badge |
+|--------|------|-------|
+| 🔵 Beta Manager | `/data/user_de/0/com.android.shell/beta/plugins/` | BETA |
+| 🟢 Magisk | `/data/adb/modules/` | MAGISK |
+| 🟣 KernelSU | `/data/adb/ksu/modules/` | KSU |
+| 🟡 APatch | `/data/adb/apatch/modules/` | APATCH |
+| 🟠 Axeron | `/data/adb/axeron/modules/` | AXERON |
 
 ### 🌍 Environment Variables
 
-Available sa lahat ng plugin scripts:
-
-<div align="center">
-
 | Variable | Value | Description |
 |----------|-------|-------------|
-| `BETA` | `true` | ✅ Confirms running under Beta Manager |
-| `BETAVER` | `int` | 📊 Server version (e.g. `10001`) |
-| `AXERON` | `true` | 🔄 AxManager compatibility flag |
-| `AXERONVER` | `int` | 🔄 AxManager version (same as BETAVER) |
-| `MODDIR` | `path` | 📂 Base path ng module |
-| `MODPATH` | `path` | 📂 Install target (customize.sh only) |
-| `ARCH` | `arm/arm64/x86/x64` | 🖥️ CPU architecture |
-| `IS64BIT` | `true/false` | 🔢 64-bit check |
-| `API` | `int` | 📱 Android API level (e.g. `34`) |
-| `BOOTMODE` | `true` | 🚀 Always true under Beta Manager |
+| `BETA` | `true` | Confirms running under Beta Manager |
+| `BETAVER` | `10004` | Server version |
+| `AXERON` | `true` | AxManager compatibility flag |
+| `AXERONVER` | `10004` | AxManager version |
+| `MODDIR` | path | Base path of module |
+| `MODPATH` | path | Install target (customize.sh only) |
+| `ARCH` | arm/arm64/x86/x64 | CPU architecture |
+| `IS64BIT` | true/false | 64-bit check |
+| `API` | int | Android API level |
+| `BOOTMODE` | `true` | Always true under Beta Manager |
 
-</div>
+---
+
+## 🎮 SUPPORTED GAMES (22)
+
+| Game | Package |
+|------|---------|
+| Mobile Legends | `com.mobile.legends` |
+| COD Mobile | `com.activision.callofduty.shooter` |
+| PUBG Mobile | `com.tencent.ig` |
+| BGMI | `com.pubg.imobile` |
+| Genshin Impact | `com.miHoYo.GenshinImpact` |
+| Wild Rift | `com.riotgames.league.wildrift` |
+| Farlight 84 | `com.farlightgames.ig` |
+| Free Fire | `com.dts.freefireth` |
+| Free Fire Max | `com.dts.freefiremax` |
+| Arena of Valor | `com.tencent.tmgp.sgame` |
+| Honor of Kings | `com.tencent.tmgp.kr` |
+| Valorant Mobile | `com.riotgames.valorant` |
+| Honkai: Star Rail | `com.miHoYo.hkrpg` |
+| Zenless Zone Zero | `com.miHoYo.zzz` |
+| Wuthering Waves | `com.kuro.wutheringwaves` |
+| Diablo Immortal | `com.blizzard.diablo.immortal` |
+| Apex Legends Mobile | `com.ea.gp.apexlegendsmobilefps` |
+| Minecraft | `com.mojang.minecraftpe` |
+| Roblox | `com.roblox.client` |
+| + CN variants (MLBB CN, COD CN, PUBG CN) | — |
 
 ---
 
@@ -324,32 +323,24 @@ Available sa lahat ng plugin scripts:
 <div align="center">
 
 ```
-📱 User opens Beta Manager
-        │
-        ▼
-🔍 App checks: is BetaService running?
-        │
-    ✅ YES ──► Load dashboard
-        │
-    ❌ NO ──┤
-            ▼
-        🤖 AUTO-DETECT PRIVILEGE
-            │
-        ┌───┴───┐
-        ▼       ▼
-   ⚡ Root   🔑 Shizuku
-   Available  Available
-        │       │
-        ▼       ▼
-   su -c     Shizuku
-   start     .newProcess
-   service   start service
-        │       │
-        └───┬───┘
-            ▼
-    ✅ BetaService RUNNING
-    📊 Loading modules...
-    🔍 Deep scanning all dirs...
+📱 App opens
+     │
+     ▼
+🔍 Is BetaService running?
+     │
+  ✅ YES ──► Load dashboard
+     │
+  ❌ NO ──► 🤖 AUTO-DETECT
+               │
+        ┌──────┼──────┐
+        ▼      ▼      ▼
+    Root    Shizuku  ADB
+    (su)    (newProc) (wireless/usb/tcp)
+        │      │      │
+        └──────┴──────┘
+               ▼
+       ✅ BetaService RUNNING
+       📊 Loading 6-source scan...
 ```
 
 </div>
@@ -361,38 +352,25 @@ Available sa lahat ng plugin scripts:
 <div align="center">
 
 ```
-┌──────────────────────────────────────────────────────────┐
-│ 📥 INSTALL                                                │
-│                                                           │
-│  User selects ZIP ──► Choose flash target:                │
-│      │               ├── 🔵 Beta Manager                  │
-│      │               ├── 🟢 Magisk Modules                │
-│      │               └── 🟣 KernelSU Modules              │
-│      ▼                                                    │
-│  Validate module.prop ──► Extract ZIP ──► Run customize.sh│
-│                                                           │
-│  ✅ Module installed!                                      │
-├──────────────────────────────────────────────────────────┤
-│ 🚀 BOOT (per enabled plugin)                               │
-│                                                           │
-│  Android BOOT_COMPLETED ──► BetaService starts            │
-│      │                                                    │
-│      ├── 🔄 post-fs-data.sh  (early boot)                 │
-│      └── ⚡ service.sh  (late_start daemon)               │
-│                                                           │
-├──────────────────────────────────────────────────────────┤
-│ 🎯 ACTION BUTTON                                          │
-│  User taps "Action" ──► Runs action.sh                    │
-│                                                           │
-├──────────────────────────────────────────────────────────┤
-│ 🚫 DISABLE                                                │
-│  Creates plugins/<id>/disable flag                        │
-│                                                           │
-├──────────────────────────────────────────────────────────┤
-│ 🗑️ REMOVE                                                 │
-│  Creates plugins/<id>/remove flag                         │
-│  Next boot: run uninstall.sh → delete folder              │
-└──────────────────────────────────────────────────────────┘
+📥 INSTALL
+   User selects ZIP → Choose flash target (BETA/MAGISK/KSU/APATCH/AXERON)
+   → Validate module.prop → Extract ZIP → Run customize.sh
+   → ✅ Installed!
+
+🚀 BOOT (per enabled plugin)
+   BOOT_COMPLETED / LOCKED_BOOT_COMPLETED
+   → post-fs-data.sh (early boot)
+   → service.sh (late_start daemon)
+
+🎯 ACTION BUTTON
+   User taps "Action" → Runs action.sh → Output shown in app
+
+🚫 DISABLE
+   Creates plugins/<id>/disable flag
+
+🗑️ REMOVE
+   Creates plugins/<id>/remove flag
+   Next boot: uninstall.sh → delete folder
 ```
 
 </div>
@@ -401,67 +379,22 @@ Available sa lahat ng plugin scripts:
 
 ## 🌐 WEBUI FLOW
 
-<div align="center">
-
 ```
-Plugin may webroot/index.html
-        │
-        ▼
-User taps "WebUI" sa plugin card
-        │
-        ▼
-WebView loads index.html
-        │
-        ▼
-JavaScript can call shell commands via:
-        │
-        ├── 🖥️ ksu.exec(cmd)     → via BetaService AIDL
-        ├── 💬 ksu.toast(msg)    → Android toast
-        └── 🔲 ksu.fullScreen(bool) → UI toggle
+Plugin has webroot/index.html
+   → User taps "WebUI" on plugin card
+   → WebView loads index.html
+   → JS calls:
+       ksu.exec(cmd)        → via BetaService AIDL
+       ksu.toast(msg)       → Android toast
+       ksu.fullScreen(bool) → UI toggle
 ```
-
-</div>
-
-> **⚡ Difference vs KernelSU:**  
-> - Permissions: shell-level (root or Shizuku), not kernel  
-> - `webroot` path: local to plugin directory  
-> - No need for `/data/adb/modules/<id>/webroot`
 
 ---
 
 ## 🖥️ SHELL EXECUTOR
 
-<div align="center">
-
-```
-┌─────────────────────────────────────────────┐
-│  🖥️  Shell Executor                         │
-├─────────────────────────────────────────────┤
-│  $ echo "Hello from Beta Manager!"          │
-│  Hello from Beta Manager!                   │
-│                                             │
-│  $ cat /proc/cpuinfo | grep processor       │
-│  processor  : 0                             │
-│  processor  : 1                             │
-│  processor  : 2                             │
-│  processor  : 3                             │
-│                                             │
-│  $ perf_status                              │
-│  CPU: performance                           │
-│  GPU: boosted                               │
-│  Temp: 42°C                                 │
-│                                             │
-├─────────────────────────────────────────────┤
-│  ┌───────────────────────────────────────┐  │
-│  │  Type command...                    ▶  │  │
-│  └───────────────────────────────────────┘  │
-└─────────────────────────────────────────────┘
-```
-
-</div>
-
-> Run shell commands directly from the app with AIDL-backed execution.  
-> May command history (last 100), ANSI output, at real-time feedback.
+Run shell commands directly from the app with AIDL-backed execution.
+Command history (last 100), real-time output, elevated via detected root type.
 
 ---
 
@@ -470,19 +403,20 @@ JavaScript can call shell commands via:
 <div align="center">
 
 | Category | Technology | Version |
-|----------|-----------|---------|
+|----------|-----------|---------| 
 | 🗣️ **Language** | Kotlin | 2.1.0 |
 | 🎨 **UI Framework** | Jetpack Compose + Material 3 | BOM 2024.12 |
 | 🏗️ **Architecture** | MVVM (ViewModel + StateFlow) | — |
 | 🖥️ **Backend** | Android Service + AIDL IPC | — |
-| 🔑 **Privilege (Root)** | su / Magisk / KernelSU / APatch | — |
-| 🔑 **Privilege (Non-root)** | Shizuku API | 13.1.5 |
+| 🔑 **Root** | Magisk / KernelSU / APatch / Axeron / su | — |
+| 🔑 **Non-root** | Shizuku API | 13.1.5 |
 | 🔄 **Async** | Kotlin Coroutines | 1.9.0 |
 | 🧭 **Navigation** | Navigation Compose | 2.8.5 |
 | 💾 **Persistence** | DataStore Preferences | 1.1.3 |
 | ⚙️ **Build** | Gradle + AGP | 8.11.1 / 8.7.3 |
 | 📱 **Minimum SDK** | Android 8.0 (Oreo) | API 26 |
-| 🎯 **Compile SDK** | Android 15 | API 35 |
+| 🎯 **Target SDK** | Android 15 | API 35 |
+| 🔢 **Version Code** | 10004 | v1.3.0 |
 
 </div>
 
@@ -490,21 +424,38 @@ JavaScript can call shell commands via:
 
 ## 🔧 BUILD INSTRUCTIONS
 
+### ✅ Tested & Working Build Commands
+
 ```bash
-# 📥 Clone the repository
-git clone https://github.com/willygailo/BETA-MANAGER.git BetaManager
-cd BetaManager
+# 1. Go to project folder
+cd "/home/willygailo/Documents/BETA MANAGER"
 
-# 🏗️ Build debug APK
+# 2. Set Java 21 (required — Java 17+ supported, Java 21 recommended)
 export JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64
-export ANDROID_HOME=/path/to/android-sdk
-./gradlew assembleDebug
 
+# 3. Set Android SDK path
+export ANDROID_HOME=/home/willygailo/Android/Sdk
+
+# 4. Build debug APK
+./gradlew assembleDebug 2>&1
+
+# ✅ Expected output: BUILD SUCCESSFUL in ~39s
 # 📍 APK location:
 #    app/build/outputs/apk/debug/app-debug.apk
+```
 
-# 📱 Install sa connected phone
+### 📱 Install to Connected Phone
+
+```bash
+# Install via ADB
 adb install -r app/build/outputs/apk/debug/app-debug.apk
+```
+
+### 🏗️ Build Release APK
+
+```bash
+# Build release (requires signing config in build.gradle.kts)
+./gradlew assembleRelease 2>&1
 ```
 
 ### 📦 Build Sample Plugin
@@ -514,21 +465,15 @@ cd "cpu boost"
 chmod +x *.sh
 ./build.sh     # creates cpu_boost_v2.0.0.zip
 
-# Push sa phone para i-install via Beta Manager
+# Push to phone for installation via Beta Manager
 adb push cpu_boost_v2.0.0.zip /sdcard/
 ```
-
-<div align="center">
-
-### 📋 Requirements
 
 | Tool | Version |
 |------|---------|
 | ☕ **JDK** | 21 LTS |
 | 📱 **Android SDK** | 35+ |
 | 🐘 **Gradle** | 8.11.1 |
-
-</div>
 
 ---
 
@@ -538,8 +483,9 @@ adb push cpu_boost_v2.0.0.zip /sdcard/
 
 ```
 ╔══════════════════════════════════════════════════════╗
-║              BETA MANAGER v1.2.0                     ║
+║              BETA MANAGER v1.3.0                     ║
 ║         Universal Module Manager for Android         ║
+║         Android 8 (API 26) → Android 16 (API 36)    ║
 ║                                                      ║
 ║           Copyright © 2026 Willy Jr. C. Gailo        ║
 ║              All Rights Reserved                     ║
@@ -552,23 +498,21 @@ adb push cpu_boost_v2.0.0.zip /sdcard/
 
 <div align="center">
   <p>
-    <strong>⚡ BETA MANAGER</strong> — <em>Root + Non-rooted Module Manager</em>
+    <strong>⚡ BETA MANAGER v1.3.0</strong> — <em>Root + Non-rooted Universal Module Manager</em>
   </p>
   <p>
     Built with ❤️ by <strong>Willy Jr. C. Gailo</strong>
   </p>
-  <br>
   <p>
-    <img src="https://img.shields.io/badge/Kotlin-7F52FF?style=flat-square&logo=kotlin&logoColor=white" alt="Kotlin">
-    <img src="https://img.shields.io/badge/Jetpack_Compose-4285F4?style=flat-square&logo=jetpackcompose&logoColor=white" alt="Compose">
-    <img src="https://img.shields.io/badge/Material_3-0066FF?style=flat-square&logo=materialdesign&logoColor=white" alt="Material3">
-    <img src="https://img.shields.io/badge/Android-34A853?style=flat-square&logo=android&logoColor=white" alt="Android">
-    <img src="https://img.shields.io/badge/Shizuku-8B5CF6?style=flat-square&logo=shizuku&logoColor=white" alt="Shizuku">
+    <img src="https://img.shields.io/badge/Kotlin-7F52FF?style=flat-square&logo=kotlin&logoColor=white">
+    <img src="https://img.shields.io/badge/Jetpack_Compose-4285F4?style=flat-square&logo=jetpackcompose&logoColor=white">
+    <img src="https://img.shields.io/badge/Material_3-0066FF?style=flat-square&logo=materialdesign&logoColor=white">
+    <img src="https://img.shields.io/badge/Android_8--16-34A853?style=flat-square&logo=android&logoColor=white">
+    <img src="https://img.shields.io/badge/Shizuku-8B5CF6?style=flat-square">
   </p>
-  <br>
   <p>
     <a href="https://github.com/willygailo/BETA-MANAGER">GitHub</a> ·
     <a href="#-features">Features</a> ·
-    <a href="#️-architecture">Architecture</a>
+    <a href="TUTORIAL.md">Plugin Tutorial</a>
   </p>
 </div>

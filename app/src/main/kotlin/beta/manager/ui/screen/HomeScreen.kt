@@ -23,7 +23,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.graphics.Color
-import beta.manager.adb.ActivationMode
 import beta.manager.plugin.PluginInfo
 import beta.manager.plugin.PluginSource
 import beta.manager.ui.theme.*
@@ -118,11 +117,8 @@ fun HomeScreen(
                 items(uiState.modules) { module ->
                     ModuleCard(
                         plugin = module,
-                        onToggle = {
-                            viewModel.activate(ActivationMode.ROOT_SU)
-                            viewModel.refreshStatus()
-                        },
-                        onRemove = { viewModel.cleanAll() }
+                        onToggle = { viewModel.toggleModule(module.id) },
+                        onRemove = { viewModel.removeModule(module.id) }
                     )
                 }
             }
@@ -365,12 +361,16 @@ private fun ModuleCard(
         PluginSource.AXMANAGER -> NeonOrange
         PluginSource.MAGISK -> NeonGreen
         PluginSource.KSU -> NeonPurple
+        PluginSource.APATCH -> NeonYellow
+        PluginSource.AXERON -> NeonPink
     }
     val sourceLabel = when (plugin.source) {
         PluginSource.BETA -> "BETA"
         PluginSource.AXMANAGER -> "AXRON"
         PluginSource.MAGISK -> "MAGISK"
         PluginSource.KSU -> "KSU"
+        PluginSource.APATCH -> "APATCH"
+        PluginSource.AXERON -> "AXERON"
     }
 
     Card(

@@ -55,6 +55,7 @@ class GameProfilesViewModel(application: Application) : AndroidViewModel(applica
             GameProfile("mlbb", "Mobile Legends", "com.mobile.legends"),
             GameProfile("codm", "COD Mobile", "com.activision.callofduty.shooter"),
             GameProfile("pubg", "PUBG Mobile", "com.tencent.ig"),
+            GameProfile("bgmi", "Battlegrounds Mobile India", "com.pubg.imobile"),
             GameProfile("genshin", "Genshin Impact", "com.miHoYo.GenshinImpact"),
             GameProfile("wildrift", "Wild Rift", "com.riotgames.league.wildrift"),
             GameProfile("farlight", "Farlight 84", "com.farlightgames.ig"),
@@ -64,10 +65,15 @@ class GameProfilesViewModel(application: Application) : AndroidViewModel(applica
             GameProfile("freefire", "Free Fire", "com.dts.freefireth"),
             GameProfile("freefiremax", "Free Fire Max", "com.dts.freefiremax"),
             GameProfile("arena", "Arena of Valor", "com.tencent.tmgp.sgame"),
+            GameProfile("hok", "Honor of Kings", "com.tencent.tmgp.kr"),
             GameProfile("valorant", "Valorant Mobile", "com.riotgames.valorant"),
             GameProfile("honkai", "Honkai: Star Rail", "com.miHoYo.hkrpg"),
             GameProfile("zzz", "Zenless Zone Zero", "com.miHoYo.zzz"),
             GameProfile("wuthering", "Wuthering Waves", "com.kuro.wutheringwaves"),
+            GameProfile("diablo", "Diablo Immortal", "com.blizzard.diablo.immortal"),
+            GameProfile("apex", "Apex Legends Mobile", "com.ea.gp.apexlegendsmobilefps"),
+            GameProfile("minecraft", "Minecraft", "com.mojang.minecraftpe"),
+            GameProfile("roblox", "Roblox", "com.roblox.client"),
         )
         val pm = context.packageManager
         return knownGames.map { game ->
@@ -131,6 +137,11 @@ class GameProfilesViewModel(application: Application) : AndroidViewModel(applica
         }
         _profiles.value = updated
         saveToFile()
+        // Apply performance tweaks when a profile is activated
+        val profile = updated.find { it.id == id }
+        if (profile?.isActive == true) {
+            viewModelScope.launch { applyProfile(id) }
+        }
     }
 
     suspend fun applyProfile(id: String) {

@@ -39,11 +39,31 @@ class PluginInstaller(
             "/data/adb/ksu/modules/",
             "/data/adb/modules/"
         )
-        val targetDir = ksuModules.firstOrNull { File(it).exists() }
+        val targetDir = ksuModules.firstOrNull { java.io.File(it).exists() }
             ?: return InstallResult(false, "KernelSU modules directory not found")
 
         val result = installInternal(zipPath, flashToMagisk = true, magiskTarget = targetDir)
         return result
+    }
+
+    suspend fun installToAPatch(zipPath: String): InstallResult {
+        val apatchModules = listOf(
+            "/data/adb/apatch/modules/",
+            "/data/adb/modules/"
+        )
+        val targetDir = apatchModules.firstOrNull { java.io.File(it).exists() }
+            ?: return InstallResult(false, "APatch modules directory not found")
+        return installInternal(zipPath, flashToMagisk = true, magiskTarget = targetDir)
+    }
+
+    suspend fun installToAxeron(zipPath: String): InstallResult {
+        val axeronModules = listOf(
+            "/data/adb/axeron/modules/",
+            "/data/adb/modules/"
+        )
+        val targetDir = axeronModules.firstOrNull { java.io.File(it).exists() }
+            ?: return InstallResult(false, "Axeron Manager modules directory not found")
+        return installInternal(zipPath, flashToMagisk = true, magiskTarget = targetDir)
     }
 
     private suspend fun installInternal(

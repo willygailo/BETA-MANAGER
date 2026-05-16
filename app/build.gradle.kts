@@ -11,9 +11,9 @@ android {
     defaultConfig {
         applicationId = "beta.manager"
         minSdk = 26
-        targetSdk = 34
-        versionCode = 10003
-        versionName = "1.2.0"
+        targetSdk = 35
+        versionCode = 10004
+        versionName = "1.3.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
