@@ -68,8 +68,10 @@
 | 💾 **DataStore Settings** | Persistent toggles that survive app restarts |
 | ⚡ **Game Boost** | One-tap CPU governor, GPU boost, memory optimization — **validates elevation before applying** |
 | 🔧 **Version Info** | Query Magisk / KSU / APatch / Axeron version via AIDL |
-| 🔑 **Non-Rooted Support** | **Full Shizuku fallback** — app-private directories when elevated access unavailable |
+| 🔑 **Non-Rooted support** | **Full Shizuku fallback** — app-private directories when elevated access unavailable |
 | 🛡️ **Consent-Based Activation** | No auto-activation on first launch — user chooses activation method |
+| ⚡ **Sync Execution APIs** | `executeSync`, `scanPluginsSync` with `@Volatile` cached root/binder state |
+| 📊 **Progress UI** | Real-time scan progress indicator during 6-source plugin scanning |
 
 </div>
 
@@ -436,6 +438,18 @@ Shell.executeWithElevation(cmd)
    └── 3. Nothing? → Shell.Result.Error("No elevated access")
 ```
 
+### Sync Execution APIs (v1.4.0)
+
+For simpler ViewModel/Service integration, v1.4.0 introduces synchronous execution wrappers:
+
+| API | Description |
+|-----|-------------|
+| `Shell.executeSync(cmd)` | Blocking shell execution with root type detection |
+| `ShizukuShell.executeSync(cmd)` | Blocking Shizuku execution with binder state caching |
+| `PluginManager.scanPluginsSync()` | Blocking 6-source plugin scan with progress callbacks |
+
+All sync APIs use `@Volatile` cached root type and binder state to avoid redundant detection calls.
+
 ---
 
 ## 📦 TECH STACK
@@ -454,6 +468,7 @@ Shell.executeWithElevation(cmd)
 | 🧭 **Navigation** | Navigation Compose | 2.8.5 |
 | 💾 **Persistence** | DataStore Preferences | 1.1.3 |
 | ⚙️ **Build** | Gradle + AGP | 8.11.1 / 8.7.3 |
+| ☕ **JVM Target** | Java 17 (with coreLibraryDesugaring) | JDK 21 for Gradle daemon |
 | 📱 **Minimum SDK** | Android 8.0 (Oreo) | API 26 |
 | 🎯 **Target SDK** | Android 15 | API 35 |
 | 🔢 **Version Code** | 10004 | v1.4.0 |
