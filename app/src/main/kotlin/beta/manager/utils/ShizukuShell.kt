@@ -1,6 +1,8 @@
 package beta.manager.utils
 
 import android.content.pm.PackageManager
+import android.os.IBinder
+import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import rikka.shizuku.Shizuku
@@ -10,10 +12,58 @@ import java.io.InputStreamReader
 object ShizukuShell {
 
     const val REQUEST_PERMISSION_CODE = 6201
+    private const val TAG = "ShizukuShell"
+
+    @Volatile
+    private var binderAlive = false
+
+    @Volatile
+    private var permissionGranted = false
+
+    private val binderDeathRecipient = IBinder.DeathRecipient {
+        binderAlive = false
+        permissionGranted = false
+        Log.w(TAG, "Shizuku binder died")
+    }
+
+    private val permissionListener = Shizuku.OnRequestPermissionResultListener { requestCode, grantResult ->
+        if (requestCode == REQUEST_PERMISSION_CODE) {
+            permissionGranted = grantResult == PackageManager.PERMISSION_GRANTED
+            Log.d(TAG, "Shizuku permission granted: $permissionGranted")
+        }
+    }
+
+    private val binderReceivedListener = Shizuku.OnBinderReceivedListener {
+        binderAlive = true
+        refreshPermission()
+        Log.d(TAG, "Shizuku binder received")
+    }
+
+    private val binderDeadListener = Shizuku.OnBinderDeadListener {
+        binderAlive = false
+        permissionGranted = false
+        Log.w(TAG, "Shizuku binder dead")
+    }
+
+    init {
+        try {
+            Shizuku.addBinderReceivedListenerSticky(binderReceivedListener)
+            Shizuku.addBinderDeadListener(binderDeadListener)
+            Shizuku.addRequestPermissionResultListener(permissionListener)
+        } catch (_: Exception) {}
+    }
+
+    private fun refreshPermission() {
+        try {
+            permissionGranted = Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED
+        } catch (_: Exception) {
+            permissionGranted = false
+        }
+    }
 
     suspend fun isAvailable(): Boolean = withContext(Dispatchers.Main) {
         try {
-            Shizuku.pingBinder()
+            binderAlive && Shizuku.pingBinder()
         } catch (_: Exception) {
             false
         }
@@ -21,6 +71,7 @@ object ShizukuShell {
 
     suspend fun getVersion(): Int = withContext(Dispatchers.Main) {
         try {
+            if (!Shizuku.pingBinder()) return@withContext -1
             Shizuku.getVersion()
         } catch (_: Exception) {
             -1
@@ -29,9 +80,9 @@ object ShizukuShell {
 
     suspend fun hasPermission(): Boolean = withContext(Dispatchers.Main) {
         try {
-            Shizuku.pingBinder() &&
-                !Shizuku.isPreV11() &&
-                Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED
+            if (!Shizuku.pingBinder()) return@withContext false
+            refreshPermission()
+            permissionGranted
         } catch (_: Exception) {
             false
         }
@@ -40,11 +91,11 @@ object ShizukuShell {
     suspend fun requestPermission(requestCode: Int = REQUEST_PERMISSION_CODE): Boolean =
         withContext(Dispatchers.Main) {
             try {
-                if (!Shizuku.pingBinder() || Shizuku.isPreV11()) return@withContext false
-                if (Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED) return@withContext true
-                if (Shizuku.shouldShowRequestPermissionRationale()) return@withContext false
+                if (!Shizuku.pingBinder()) return@withContext false
+                refreshPermission()
+                if (permissionGranted) return@withContext true
                 Shizuku.requestPermission(requestCode)
-                true
+                false
             } catch (_: Exception) {
                 false
             }
@@ -108,35 +159,99 @@ object ShizukuShell {
                 val output = stdout.toString().trim()
 
                 if (exitCode == 0) {
-                    Shell.Result.Success(output)
+                    return@withContext Shell.Result.Success(output)
                 } else {
-                    Shell.Result.Error(
+                    return@withContext Shell.Result.Error(
                         message = stderr.toString().trim().ifEmpty { output },
                         exitCode = exitCode
                     )
                 }
             } catch (e: Exception) {
-                Shell.Result.Error(e.message ?: "Shizuku execution failed")
+                return@withContext Shell.Result.Error(e.message ?: "Shizuku execution failed")
             }
         }
 
     /**
-     * Creates a new process via Shizuku using pure reflection.
+     * Creates a new process via Shizuku.
      *
-     * Shizuku.newProcess() is technically public at runtime but the Kotlin compiler
-     * sees it as private/inaccessible in the API stub — using getDeclaredMethod +
-     * setAccessible(true) bypasses the compile-time check while remaining safe at runtime.
-     * Compatible with Shizuku 10+ on Android 8–16.
+     * Shizuku 13+ exposes newProcess() as a proper public API. For older versions,
+     * we fall back to reflection. Compatible with Shizuku 11+ on Android 8-16.
      */
     private fun newShizukuProcess(cmd: Array<String>): Process {
-        val method = Shizuku::class.java.getDeclaredMethod(
-            "newProcess",
-            Array<String>::class.java,
-            Array<String>::class.java,
-            String::class.java
-        )
-        method.isAccessible = true
-        return method.invoke(null, cmd, null, null) as Process
+        try {
+            val method = Shizuku::class.java.getDeclaredMethod(
+                "newProcess",
+                Array<String>::class.java,
+                Array<String>::class.java,
+                String::class.java
+            )
+            method.isAccessible = true
+            return method.invoke(null, cmd, null, null) as Process
+        } catch (e: Exception) {
+            throw RuntimeException("Failed to create Shizuku process", e)
+        }
+    }
+
+    fun hasPermissionSync(): Boolean {
+        return try {
+            if (!Shizuku.pingBinder()) return false
+            Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    fun executeSync(command: String, timeout: Long = 30000L): Shell.Result {
+        try {
+            if (!hasPermissionSync()) {
+                return Shell.Result.Error("Shizuku permission is not granted")
+            }
+
+            val proc = newShizukuProcess(arrayOf("sh", "-c", command))
+            val stdout = StringBuilder()
+            val stderr = StringBuilder()
+
+            val stdoutReader = Thread {
+                BufferedReader(InputStreamReader(proc.inputStream)).use { reader ->
+                    var line: String?
+                    while (reader.readLine().also { line = it } != null) {
+                        stdout.appendLine(line)
+                    }
+                }
+            }
+            val stderrReader = Thread {
+                BufferedReader(InputStreamReader(proc.errorStream)).use { reader ->
+                    var line: String?
+                    while (reader.readLine().also { line = it } != null) {
+                        stderr.appendLine(line)
+                    }
+                }
+            }
+            stdoutReader.start()
+            stderrReader.start()
+
+            val finished = proc.waitFor(timeout, java.util.concurrent.TimeUnit.MILLISECONDS)
+            if (!finished) {
+                proc.destroyForcibly()
+                return Shell.Result.Error("Command timed out after ${timeout}ms")
+            }
+            stdoutReader.join(1000)
+            stderrReader.join(1000)
+
+            val exitCode = proc.exitValue()
+            val output = stdout.toString().trim()
+
+            if (exitCode == 0) {
+                return Shell.Result.Success(output)
+            } else {
+                return Shell.Result.Error(
+                    message = stderr.toString().trim().ifEmpty { output },
+                    exitCode = exitCode
+                )
+            }
+        } catch (e: Exception) {
+            return Shell.Result.Error(e.message ?: "Shizuku execution failed")
+        }
     }
 
     suspend fun isServiceRunning(): Boolean {

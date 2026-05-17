@@ -18,6 +18,7 @@ import beta.manager.plugin.PluginManager
 import beta.manager.service.BetaService
 import beta.manager.utils.PreferencesManager
 import beta.manager.utils.Shell
+import beta.manager.utils.ShizukuShell
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -50,7 +51,14 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     private val activator = AdbActivator(application)
     private val client = AdbClient(application)
     private val prefs = PreferencesManager(application)
-    private val pluginManager = PluginManager("/data/user_de/0/com.android.shell/beta/plugins/")
+    private val hasElevatedPrivileges: Boolean
+        get() = Shell.isRootAvailableSync() || ShizukuShell.hasPermissionSync()
+    private val pluginDir: String
+        get() = if (hasElevatedPrivileges)
+            "/data/user_de/0/com.android.shell/beta/plugins/"
+        else
+            getApplication<Application>().filesDir.absolutePath + "/beta/plugins/"
+    private val pluginManager by lazy { PluginManager(pluginDir) }
     private var betaService: IBetaService? = null
     private var serviceBound = false
 
@@ -82,9 +90,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             )
             checkService()
             scanModules()
-            if (!_uiState.value.isServiceRunning) {
-                autoActivate()
-            }
+            // Do not auto-activate on first launch - let user choose
             _uiState.value = _uiState.value.copy(isLoaded = true)
         }
     }
@@ -217,10 +223,18 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             val current = _uiState.value.isGameBoosted
             _uiState.value = _uiState.value.copy(isBoosting = true)
             if (!current) {
-                Shell.executeWithElevation("for cpu in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do echo performance > \$cpu 2>/dev/null; done")
-                Shell.executeWithElevation("echo 1 > /sys/class/kgsl/kgsl-3d0/force_bus_on 2>/dev/null; echo 1 > /sys/class/kgsl/kgsl-3d0/force_clk_on 2>/dev/null")
-                Shell.executeWithElevation("echo 0 > /sys/class/kgsl/kgsl-3d0/max_pwrlevel 2>/dev/null")
-                Shell.executeWithElevation("echo 1 > /proc/sys/vm/compact_memory 2>/dev/null")
+                val r1 = Shell.executeWithElevation("for cpu in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do echo performance > \$cpu 2>/dev/null; done")
+                val r2 = Shell.executeWithElevation("echo 1 > /sys/class/kgsl/kgsl-3d0/force_bus_on 2>/dev/null; echo 1 > /sys/class/kgsl/kgsl-3d0/force_clk_on 2>/dev/null")
+                val r3 = Shell.executeWithElevation("echo 0 > /sys/class/kgsl/kgsl-3d0/max_pwrlevel 2>/dev/null")
+                val r4 = Shell.executeWithElevation("echo 1 > /proc/sys/vm/compact_memory 2>/dev/null")
+                val allFailed = listOf(r1, r2, r3, r4).all { it is Shell.Result.Error }
+                if (allFailed) {
+                    _uiState.value = _uiState.value.copy(
+                        isBoosting = false,
+                        activationLog = "Game Boost requires root or Shizuku permission"
+                    )
+                    return@launch
+                }
             } else {
                 Shell.executeWithElevation("for cpu in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do echo schedutil > \$cpu 2>/dev/null; done")
                 Shell.executeWithElevation("echo 0 > /sys/class/kgsl/kgsl-3d0/force_bus_on 2>/dev/null; echo 0 > /sys/class/kgsl/kgsl-3d0/force_clk_on 2>/dev/null")

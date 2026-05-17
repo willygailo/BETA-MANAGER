@@ -1,7 +1,7 @@
 <div align="center">
   <br>
   <h1>📦 BETA MANAGER PLUGIN TUTORIAL</h1>
-  <p><strong>Gawing tama ang iyong plugin module ZIP para sa Beta Manager v1.3.0</strong></p>
+  <p><strong>Gawing tama ang iyong plugin module ZIP para sa Beta Manager v1.4.0</strong></p>
   <p>Magisk/KSU/APatch/Axeron-style modules · Root + Shizuku · Android 8–16</p>
   <br>
 </div>
@@ -35,13 +35,15 @@ Ang **Beta Manager plugin** ay isang ZIP file na naglalaman ng scripts at binari
 | Feature | Magisk Module | Beta Manager Plugin |
 |---------|--------------|-------------------|
 | Root required | ✅ Yes | ❌ **No** (Shizuku kung non-rooted) |
-| Runtime dir | `/data/adb/modules/` | `/data/user_de/0/com.android.shell/beta/plugins/` |
+| Runtime dir (elevated) | `/data/adb/modules/` | `/data/user_de/0/com.android.shell/beta/plugins/` |
+| Runtime dir (app-private) | N/A | `/data/data/beta.manager/files/beta/plugins/` |
 | Scanned sources | Magisk only | **6 sources**: Beta + AxManager + Magisk + KSU + APatch + Axeron |
 | Permission level | Root (init) | Shell-level (su or Shizuku) |
 | Script format | `sh` scripts | `sh` scripts (same format) |
 | WebUI support | `ksu.exec` bridge | `ksu.exec` bridge (compatible) |
 | Flash targets | 1 | **5**: Beta / Magisk / KSU / APatch / Axeron |
 | Device support | Rooted only | **Android 8–16, Rooted + Non-rooted** |
+| Auto-activation | Yes | ❌ **No** — consent-based, user chooses method |
 
 ---
 
@@ -103,7 +105,7 @@ axeronPlugin=10004
 
 | Field | Description |
 |-------|-------------|
-| `betaPlugin` | Minimum Beta Manager version code (`10004` = v1.3.0) |
+| `betaPlugin` | Minimum Beta Manager version code (`10004` = v1.4.0) |
 | `axeronPlugin` | Same but for AxManager compatibility |
 
 > 💡 Lagyan mo ng **parehong fields** para gumana sa Beta Manager **at** AxManager:
@@ -345,7 +347,7 @@ Available sa **lahat ng scripts**:
 | Variable | Value | Description |
 |----------|-------|-------------|
 | `BETA` | `true` | Confirms running under Beta Manager |
-| `BETAVER` | `10004` | Server version (v1.3.0) |
+| `BETAVER` | `10004` | Server version (v1.4.0) |
 | `AXERON` | `true` | AxManager compatibility flag |
 | `AXERONVER` | `10004` | AxManager version |
 | `MODDIR` | path | Base path ng module — **laging gamitin** |
@@ -429,7 +431,10 @@ echo "✅ Done: ${PLUGIN_ID}_${VERSION}.zip"
 ### Via Beta Manager App
 
 1. Buksan ang **Beta Manager**
-2. Auto-activate ang service (Root → `su`, Non-root → **Shizuku**)
+2. **Service activation** — user chooses method (NO auto-activate):
+   - 🟢 **Root** — `su -c start BetaService`
+   - 🟣 **Shizuku** — `Shizuku.newProcess` → start service
+   - 📡 **ADB** — Wireless/USB/TCP activation
 3. Sa **Plugins screen**, tingnan ang **FlashMode chip selector** sa taas:
    - Piliin: 🔵 BETA / 🟢 MAGISK / 🟣 KSU / 🟡 APATCH / 🟠 AXERON
 4. I-tap ang **Install Plugin** button (FAB sa ibaba)
@@ -457,16 +462,28 @@ adb shell "
 
 ## 🔬 TESTING
 
-### Check plugin loaded
+### Check plugin loaded (elevated)
 
 ```bash
 adb shell "ls -la /data/user_de/0/com.android.shell/beta/plugins/"
 ```
 
-### Check service logs
+### Check plugin loaded (app-private, non-rooted fallback)
+
+```bash
+adb shell "run-as beta.manager ls -la files/beta/plugins/"
+```
+
+### Check service logs (elevated)
 
 ```bash
 adb shell "ls /data/user_de/0/com.android.shell/beta/logs/ && cat /data/user_de/0/com.android.shell/beta/logs/*.log 2>/dev/null"
+```
+
+### Check service logs (app-private)
+
+```bash
+adb shell "run-as beta.manager ls -la files/beta/logs/"
 ```
 
 O sa app: Home → **Logs** quick action.
@@ -549,6 +566,7 @@ Bago mo i-release ang plugin mo:
 - [ ] May logging sa `/data/user_de/0/com.android.shell/beta/logs/`
 - [ ] Ang ZIP ay **directly zipped** (hindi naka-folder sa loob)
 - [ ] Tested sa Beta Manager app (enable/disable/action/remove)
+- [ ] Tested sa **non-rooted device** with Shizuku (app-private fallback)
 
 ---
 
@@ -559,7 +577,7 @@ Bago mo i-release ang plugin mo:
 <div align="center">
   <hr>
   <p>
-    <strong>⚡ BETA MANAGER v1.3.0</strong> — <em>Universal Module Manager (Android 8–16, Root + Non-rooted)</em>
+    <strong>⚡ BETA MANAGER v1.4.0</strong> — <em>Universal Module Manager (Android 8–16, Root + Non-rooted)</em>
   </p>
   <p>
     <a href="https://github.com/willygailo/BETA-MANAGER">GitHub</a> ·

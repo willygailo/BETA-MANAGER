@@ -43,6 +43,132 @@ class PluginManager(private val pluginsDir: String) {
     private val plugins = mutableMapOf<String, PluginInfo>()
     private val pluginPaths = mutableMapOf<String, String>()
 
+    fun scanPluginsSync(): List<PluginInfo> {
+        plugins.clear()
+        pluginPaths.clear()
+        scanSingleDirSync(pluginsDir, PluginSource.BETA)
+        scanSingleDirSync(AXMANAGER_PLUGINS_DIR, PluginSource.AXMANAGER)
+        scanModulesDirSync(MAGISK_MODULES_DIR, PluginSource.MAGISK)
+        scanModulesDirSync(KSU_MODULES_DIR, PluginSource.KSU)
+        scanModulesDirSync(APATCH_MODULES_DIR, PluginSource.APATCH)
+        scanModulesDirSync(AXERON_MODULES_DIR, PluginSource.AXERON)
+        return plugins.values.toList()
+    }
+
+    private fun scanSingleDirSync(dirPath: String, source: PluginSource) {
+        val dir = File(dirPath)
+        if (dir.exists() && dir.canRead()) {
+            dir.listFiles()?.forEach { pluginDir ->
+                if (pluginDir.isDirectory) scanPluginDir(pluginDir, source)
+            }
+        } else {
+            scanElevatedDirSync(dirPath, source)
+        }
+    }
+
+    private fun scanModulesDirSync(dirPath: String, source: PluginSource) {
+        val dir = File(dirPath)
+        if (dir.exists() && dir.canRead()) {
+            dir.listFiles()?.forEach { pluginDir ->
+                if (pluginDir.isDirectory) {
+                    val propFile = File(pluginDir, "module.prop")
+                    if (!propFile.exists()) return@forEach
+                    val props = parseModuleProp(propFile)
+                    val id = props["id"] ?: pluginDir.name
+                    if (plugins.containsKey(id)) return@forEach
+                    pluginPaths[id] = pluginDir.absolutePath
+                    plugins[id] = buildPluginInfo(pluginDir, props, id, source)
+                }
+            }
+        } else {
+            scanElevatedDirSync(dirPath, source)
+        }
+    }
+
+    private fun scanElevatedDirSync(dirPath: String, source: PluginSource) {
+        val command = "for d in ${Shell.quote(dirPath)}/*; do [ -d \"\$d\" ] && [ -f \"\$d/module.prop\" ] && printf '%s\\n' \"\$d\"; done"
+        val paths = when (val result = Shell.executeSyncWithElevation(command, timeout = 10000L)) {
+            is Shell.Result.Success -> result.output.lineSequence().map { it.trim() }.filter { it.isNotEmpty() }.toList()
+            is Shell.Result.Error -> emptyList()
+        }
+
+        for (path in paths) {
+            val propResult = Shell.executeSyncWithElevation("cat ${Shell.quote("$path/module.prop")}", timeout = 10000L)
+            if (propResult !is Shell.Result.Success) continue
+
+            val propOutput = propResult.output
+            val props = parseModuleProp(propOutput)
+            val id = props["id"] ?: File(path).name
+            if (plugins.containsKey(id)) continue
+
+            val flags = when (val result = Shell.executeSyncWithElevation(
+                "[ -e ${Shell.quote("$path/remove")} ] && echo remove; " +
+                    "[ -e ${Shell.quote("$path/disable")} ] && echo disable; " +
+                    "[ -e ${Shell.quote("$path/action.sh")} ] && echo action; " +
+                    "[ -e ${Shell.quote("$path/webroot/index.html")} ] && echo webui",
+                timeout = 10000L
+            )) {
+                is Shell.Result.Success -> result.output.lineSequence().map { it.trim() }.toSet()
+                is Shell.Result.Error -> emptySet()
+            }
+
+            if ("remove" in flags) {
+                cleanupPluginSync(path)
+                continue
+            }
+
+            pluginPaths[id] = path
+            plugins[id] = PluginInfo(
+                id = id,
+                name = props["name"] ?: id,
+                version = props["version"] ?: "v1.0",
+                versionCode = props["versionCode"]?.toIntOrNull() ?: 1,
+                author = props["author"] ?: "",
+                description = props["description"] ?: "",
+                isEnabled = "disable" !in flags,
+                hasAction = "action" in flags,
+                hasWebUI = "webui" in flags,
+                source = source
+            )
+        }
+    }
+
+    fun runActionSync(id: String): Boolean {
+        val plugin = plugins[id] ?: return false
+        val pluginPath = findPluginPath(id) ?: return false
+        if (!plugin.hasAction) return false
+
+        val env: Map<String, String> = mapOf(
+            "BETA" to "true",
+            "BETAVER" to "$SERVER_VERSION",
+            "AXERON" to "true",
+            "AXERONVER" to "$SERVER_VERSION",
+            "MODDIR" to pluginPath,
+            "MODPATH" to pluginPath,
+            "ARCH" to (System.getProperty("os.arch") ?: "arm64"),
+            "API" to android.os.Build.VERSION.SDK_INT.toString()
+        )
+
+        val envStr = env.entries.joinToString(" ") { (k, v) -> "${k}=${Shell.quote(v)}" }
+        val result = Shell.executeSyncWithElevation("$envStr sh ${Shell.quote("$pluginPath/action.sh")}")
+        return result is Shell.Result.Success
+    }
+
+    private fun cleanupPluginSync(path: String) {
+        val dir = File(path)
+        if (dir.exists() && dir.canWrite()) {
+            val uninstallScript = File(dir, "uninstall.sh")
+            if (uninstallScript.exists()) {
+                Shell.executeSyncWithElevation("sh ${Shell.quote(uninstallScript.absolutePath)}")
+            }
+            dir.deleteRecursively()
+            return
+        }
+
+        Shell.executeSyncWithElevation("[ -f ${Shell.quote("$path/uninstall.sh")} ] && sh ${Shell.quote("$path/uninstall.sh")} || true")
+        Shell.executeSyncWithElevation("rm -rf ${Shell.quote(path)}")
+    }
+
     fun scanPlugins(): List<PluginInfo> {
         plugins.clear()
         pluginPaths.clear()
@@ -85,31 +211,37 @@ class PluginManager(private val pluginsDir: String) {
         }
     }
 
-    private fun scanPluginDir(pluginDir: File, source: PluginSource) {
+    private fun scanPluginDir(pluginDir: File, source: PluginSource) = runBlocking {
+        scanPluginDirSuspend(pluginDir, source)
+    }
+
+    private suspend fun scanPluginDirSuspend(pluginDir: File, source: PluginSource) {
         val propFile = File(pluginDir, "module.prop")
         if (!propFile.exists()) return
         val props = parseModuleProp(propFile)
         val id = props["id"] ?: pluginDir.name
         if (plugins.containsKey(id)) return
         if (File(pluginDir, "remove").exists()) {
-            runBlocking { cleanupPlugin(pluginDir.absolutePath) }
+            cleanupPlugin(pluginDir.absolutePath)
             return
         }
         pluginPaths[id] = pluginDir.absolutePath
         plugins[id] = buildPluginInfo(pluginDir, props, id, source)
     }
 
-    private fun scanElevatedDir(dirPath: String, source: PluginSource) {
+    private fun scanElevatedDir(dirPath: String, source: PluginSource) = runBlocking {
+        scanElevatedDirSuspend(dirPath, source)
+    }
+
+    private suspend fun scanElevatedDirSuspend(dirPath: String, source: PluginSource) {
         val command = "for d in ${Shell.quote(dirPath)}/*; do [ -d \"\$d\" ] && [ -f \"\$d/module.prop\" ] && printf '%s\\n' \"\$d\"; done"
-        val paths = when (val result = runBlocking { Shell.executeWithElevation(command, timeout = 10000L) }) {
+        val paths = when (val result = Shell.executeWithElevation(command, timeout = 10000L)) {
             is Shell.Result.Success -> result.output.lineSequence().map { it.trim() }.filter { it.isNotEmpty() }.toList()
             is Shell.Result.Error -> emptyList()
         }
 
         for (path in paths) {
-            val propResult = runBlocking {
-                Shell.executeWithElevation("cat ${Shell.quote("$path/module.prop")}", timeout = 10000L)
-            }
+            val propResult = Shell.executeWithElevation("cat ${Shell.quote("$path/module.prop")}", timeout = 10000L)
             if (propResult !is Shell.Result.Success) continue
 
             val propOutput = propResult.output
@@ -117,21 +249,19 @@ class PluginManager(private val pluginsDir: String) {
             val id = props["id"] ?: File(path).name
             if (plugins.containsKey(id)) continue
 
-            val flags = when (val result = runBlocking {
-                Shell.executeWithElevation(
-                    "[ -e ${Shell.quote("$path/remove")} ] && echo remove; " +
-                        "[ -e ${Shell.quote("$path/disable")} ] && echo disable; " +
-                        "[ -e ${Shell.quote("$path/action.sh")} ] && echo action; " +
-                        "[ -e ${Shell.quote("$path/webroot/index.html")} ] && echo webui",
-                    timeout = 10000L
-                )
-            }) {
+            val flags = when (val result = Shell.executeWithElevation(
+                "[ -e ${Shell.quote("$path/remove")} ] && echo remove; " +
+                    "[ -e ${Shell.quote("$path/disable")} ] && echo disable; " +
+                    "[ -e ${Shell.quote("$path/action.sh")} ] && echo action; " +
+                    "[ -e ${Shell.quote("$path/webroot/index.html")} ] && echo webui",
+                timeout = 10000L
+            )) {
                 is Shell.Result.Success -> result.output.lineSequence().map { it.trim() }.toSet()
                 is Shell.Result.Error -> emptySet()
             }
 
             if ("remove" in flags) {
-                runBlocking { cleanupPlugin(path) }
+                cleanupPlugin(path)
                 continue
             }
 
@@ -186,7 +316,11 @@ class PluginManager(private val pluginsDir: String) {
         return plugins.values.map { it.id }
     }
 
-    fun cleanAllMarked(): Int {
+    fun cleanAllMarked(): Int = runBlocking {
+        cleanAllMarkedSuspend()
+    }
+
+    private suspend fun cleanAllMarkedSuspend(): Int {
         var cleaned = 0
         val dirs = listOf(pluginsDir, AXMANAGER_PLUGINS_DIR, MAGISK_MODULES_DIR, KSU_MODULES_DIR, APATCH_MODULES_DIR, AXERON_MODULES_DIR)
         for (dirPath in dirs) {
@@ -194,18 +328,18 @@ class PluginManager(private val pluginsDir: String) {
             if (dir.exists() && dir.canRead()) {
                 dir.listFiles()?.forEach { pluginDir ->
                     if (pluginDir.isDirectory && File(pluginDir, "remove").exists()) {
-                        runBlocking { cleanupPlugin(pluginDir.absolutePath) }
+                        cleanupPlugin(pluginDir.absolutePath)
                         cleaned++
                     }
                 }
             } else {
                 val command = "for d in ${Shell.quote(dirPath)}/*; do [ -d \"\$d\" ] && [ -f \"\$d/remove\" ] && printf '%s\\n' \"\$d\"; done"
-                val paths = when (val result = runBlocking { Shell.executeWithElevation(command, timeout = 10000L) }) {
+                val paths = when (val result = Shell.executeWithElevation(command, timeout = 10000L)) {
                     is Shell.Result.Success -> result.output.lineSequence().map { it.trim() }.filter { it.isNotEmpty() }.toList()
                     is Shell.Result.Error -> emptyList()
                 }
                 for (path in paths) {
-                    runBlocking { cleanupPlugin(path) }
+                    cleanupPlugin(path)
                     cleaned++
                 }
             }
@@ -213,16 +347,18 @@ class PluginManager(private val pluginsDir: String) {
         return cleaned
     }
 
-    fun disable(id: String): Boolean {
+    fun disable(id: String): Boolean = runBlocking {
+        disableSuspend(id)
+    }
+
+    private suspend fun disableSuspend(id: String): Boolean {
         val pluginPath = findPluginPath(id) ?: return false
         return try {
             val disableFile = File(pluginPath, "disable")
             val success = if (disableFile.parentFile?.canWrite() == true) {
                 disableFile.exists() || disableFile.createNewFile()
             } else {
-                runBlocking {
-                    Shell.executeWithElevation("touch ${Shell.quote("$pluginPath/disable")}") is Shell.Result.Success
-                }
+                Shell.executeWithElevation("touch ${Shell.quote("$pluginPath/disable")}") is Shell.Result.Success
             }
             if (!success) return false
             val current = plugins[id] ?: return false
@@ -233,16 +369,18 @@ class PluginManager(private val pluginsDir: String) {
         }
     }
 
-    fun enable(id: String): Boolean {
+    fun enable(id: String): Boolean = runBlocking {
+        enableSuspend(id)
+    }
+
+    private suspend fun enableSuspend(id: String): Boolean {
         val pluginPath = findPluginPath(id) ?: return false
         return try {
             val disableFile = File(pluginPath, "disable")
             val success = if (disableFile.parentFile?.canWrite() == true) {
                 !disableFile.exists() || disableFile.delete()
             } else {
-                runBlocking {
-                    Shell.executeWithElevation("rm -f ${Shell.quote("$pluginPath/disable")}") is Shell.Result.Success
-                }
+                Shell.executeWithElevation("rm -f ${Shell.quote("$pluginPath/disable")}") is Shell.Result.Success
             }
             if (!success) return false
             val current = plugins[id] ?: return false
@@ -253,16 +391,18 @@ class PluginManager(private val pluginsDir: String) {
         }
     }
 
-    fun markForRemoval(id: String): Boolean {
+    fun markForRemoval(id: String): Boolean = runBlocking {
+        markForRemovalSuspend(id)
+    }
+
+    private suspend fun markForRemovalSuspend(id: String): Boolean {
         val pluginPath = findPluginPath(id) ?: return false
         return try {
             val removeFile = File(pluginPath, "remove")
             val success = if (removeFile.parentFile?.canWrite() == true) {
                 removeFile.exists() || removeFile.createNewFile()
             } else {
-                runBlocking {
-                    Shell.executeWithElevation("touch ${Shell.quote("$pluginPath/remove")}") is Shell.Result.Success
-                }
+                Shell.executeWithElevation("touch ${Shell.quote("$pluginPath/remove")}") is Shell.Result.Success
             }
             if (!success) return false
             plugins.remove(id)

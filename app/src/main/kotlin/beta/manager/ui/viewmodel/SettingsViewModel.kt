@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import beta.manager.utils.PreferencesManager
 import beta.manager.utils.Shell
+import beta.manager.utils.ShizukuShell
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -13,6 +14,8 @@ import kotlinx.coroutines.launch
 class SettingsViewModel(application: Application) : AndroidViewModel(application) {
 
     private val prefs = PreferencesManager(application)
+    private val hasElevatedPrivileges: Boolean
+        get() = Shell.isRootAvailableSync() || ShizukuShell.hasPermissionSync()
 
     private val _settings = MutableStateFlow(PreferencesManager.Settings())
     val settings: StateFlow<PreferencesManager.Settings> = _settings.asStateFlow()
@@ -49,6 +52,10 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun setThermalControl(enabled: Boolean) {
         viewModelScope.launch {
             prefs.setThermalControl(enabled)
+            if (!hasElevatedPrivileges) {
+                android.util.Log.w("SettingsViewModel", "Thermal Control requires root or Shizuku")
+                return@launch
+            }
             if (enabled) {
                 Shell.executeWithElevation("sh -c 'echo performance > /sys/class/thermal/thermal_message/sconfig 2>/dev/null || echo 0 > /sys/class/thermal/thermal_zone0/mode 2>/dev/null'")
             } else {
@@ -60,6 +67,10 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun setCpuGovernor(enabled: Boolean) {
         viewModelScope.launch {
             prefs.setCpuGovernor(enabled)
+            if (!hasElevatedPrivileges) {
+                android.util.Log.w("SettingsViewModel", "CPU Governor requires root or Shizuku")
+                return@launch
+            }
             if (enabled) {
                 Shell.executeWithElevation("for cpu in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do echo performance > \$cpu 2>/dev/null; done")
             } else {
@@ -71,6 +82,10 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun setGpuBoost(enabled: Boolean) {
         viewModelScope.launch {
             prefs.setGpuBoost(enabled)
+            if (!hasElevatedPrivileges) {
+                android.util.Log.w("SettingsViewModel", "GPU Boost requires root or Shizuku")
+                return@launch
+            }
             if (enabled) {
                 Shell.executeWithElevation("sh -c 'echo 1 > /sys/class/kgsl/kgsl-3d0/force_bus_on 2>/dev/null; echo 1 > /sys/class/kgsl/kgsl-3d0/force_clk_on 2>/dev/null; echo 1 > /sys/class/kgsl/kgsl-3d0/force_rail_on 2>/dev/null'")
             } else {

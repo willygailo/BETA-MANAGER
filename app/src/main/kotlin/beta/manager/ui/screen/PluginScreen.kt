@@ -23,6 +23,7 @@ import beta.manager.ui.component.PluginCard
 import beta.manager.ui.theme.*
 import beta.manager.ui.viewmodel.FlashMode
 import beta.manager.ui.viewmodel.PluginViewModel
+import beta.manager.utils.RootType
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -86,28 +87,17 @@ fun PluginScreen(
                 onClick = {
                     if (!uiState.isInstalling && !uiState.isFixing) onInstallPlugin()
                 },
-                containerColor = NeonCyan,
-                contentColor = DarkBackground,
+                containerColor = if (uiState.isInstalling) DarkSurfaceVariant else NeonCyan,
+                contentColor = if (uiState.isInstalling) TextTertiary else DarkBackground,
                 shape = RoundedCornerShape(16.dp),
                 icon = {
                     Icon(
-                        imageVector = Icons.Filled.Add,
+                        imageVector = if (uiState.isInstalling) Icons.Filled.Sync else Icons.Filled.Add,
                         contentDescription = null
                     )
                 },
                 text = {
-                    if (uiState.isInstalling) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(18.dp),
-                                color = DarkBackground,
-                                strokeWidth = 2.dp
-                            )
-                            Text("Installing...")
-                        }
-                    } else {
-                        Text("Install Plugin")
-                    }
+                    Text(if (uiState.isInstalling) "Installing..." else "Install Plugin")
                 }
             )
         }
@@ -117,6 +107,96 @@ fun PluginScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
+            // Root type indicator + mismatch banner
+            val detectedType = uiState.detectedRootType
+            if (detectedType != RootType.NONE) {
+                val isMismatch = when (detectedType) {
+                    RootType.MAGISK -> uiState.flashMode != FlashMode.MAGISK
+                    RootType.KERNELSU -> uiState.flashMode != FlashMode.KSU
+                    RootType.APATCH -> uiState.flashMode != FlashMode.APATCH
+                    RootType.AXERON -> uiState.flashMode != FlashMode.AXERON
+                    else -> false
+                }
+                if (isMismatch) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 4.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(NeonYellow.copy(alpha = 0.1f))
+                            .padding(10.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Filled.Warning,
+                                contentDescription = null,
+                                tint = NeonYellow,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                "Detected ${detectedType.name.lowercase()}, but using ${uiState.flashMode.name} mode",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = NeonYellow
+                            )
+                        }
+                    }
+                }
+                Row(
+                    modifier = Modifier
+                        .padding(horizontal = 16.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Shield,
+                        contentDescription = null,
+                        tint = TextTertiary,
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Text(
+                        "Detected: ${detectedType.name.lowercase()}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = TextTertiary
+                    )
+                }
+            }
+
+            // Installation progress
+            if (uiState.isInstalling) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                ) {
+                    LinearProgressIndicator(
+                        progress = { uiState.installationProgress },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(6.dp)
+                            .clip(RoundedCornerShape(3.dp)),
+                        color = NeonCyan,
+                        trackColor = DarkSurfaceVariant
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(14.dp),
+                            color = NeonCyan,
+                            strokeWidth = 2.dp
+                        )
+                        Text(
+                            uiState.installationStep.takeIf { it.isNotBlank() } ?: "Installing...",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = NeonCyan
+                        )
+                    }
+                }
+            }
+
             if (uiState.isFixing) {
                 Box(
                     modifier = Modifier

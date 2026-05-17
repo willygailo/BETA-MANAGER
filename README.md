@@ -5,7 +5,7 @@
   <p>Flash ZIP modules · Root + Non-rooted · Magisk / KSU / APatch / Axeron Compatible</p>
   <br>
   <p>
-    <img src="https://img.shields.io/badge/Version-1.3.0-00E5FF?style=for-the-badge" alt="Version">
+    <img src="https://img.shields.io/badge/Version-1.4.0-00E5FF?style=for-the-badge" alt="Version">
     <img src="https://img.shields.io/badge/Kotlin-2.1.0-7F52FF?style=for-the-badge&logo=kotlin&logoColor=white" alt="Kotlin">
     <img src="https://img.shields.io/badge/Compose-BOM_2024.12-4285F4?style=for-the-badge&logo=jetpackcompose&logoColor=white" alt="Compose">
     <img src="https://img.shields.io/badge/minSdk-26_(Android_8)-00E676?style=for-the-badge&logo=android&logoColor=white" alt="minSdk">
@@ -66,8 +66,10 @@
 | 🎨 **Cyberpunk Theme** | Neon cyan/pink/purple/yellow gaming aesthetic UI |
 | 🚨 **Crash Handling** | Global exception handler + crash report screen |
 | 💾 **DataStore Settings** | Persistent toggles that survive app restarts |
-| ⚡ **Game Boost** | One-tap CPU governor, GPU boost, memory optimization |
+| ⚡ **Game Boost** | One-tap CPU governor, GPU boost, memory optimization — **validates elevation before applying** |
 | 🔧 **Version Info** | Query Magisk / KSU / APatch / Axeron version via AIDL |
+| 🔑 **Non-Rooted Support** | **Full Shizuku fallback** — app-private directories when elevated access unavailable |
+| 🛡️ **Consent-Based Activation** | No auto-activation on first launch — user chooses activation method |
 
 </div>
 
@@ -149,13 +151,18 @@
 ⚡ ROOTED                        🔑 NON-ROOTED
     │                                   │
     ├── 🟢 Magisk (magisk --version)    └── 🟣 Shizuku
-    ├── 🔵 KernelSU (ksud / sys prop)
+    ├── 🔵 KernelSU (ksud / sys prop)        └── ADB Wireless/USB
     ├── 🟡 APatch (apd / ro.apatch.*)
     └── 🟠 Axeron Manager
          │
          ▼
-  Shell.executeWithElevation()
-  (auto-routes to correct backend)
+   Shell.executeWithElevation()
+   (auto-routes: root → su, non-root → Shizuku)
+         │
+         ▼
+   Directory Strategy:
+   ├── Elevated → /data/user_de/0/com.android.shell/beta/
+   └── App-private → /data/data/beta.manager/files/beta/
 ```
 
 </div>
@@ -180,6 +187,11 @@
 🖥️  BetaService starts
         │
         ▼
+📁 Directory Setup:
+   ├── Elevated? → /data/user_de/0/com.android.shell/beta/
+   └── No? → App-private /data/data/beta.manager/files/beta/
+        │
+        ▼
 🔍 Deep scan (6 sources):
    ├── 📁 Beta plugins dir          [BETA]
    ├── 📁 AxManager plugins dir     [AXRON]
@@ -189,7 +201,7 @@
    └── 📁 Axeron modules            [AXERON]
         │
         ▼
-✅  Dashboard loaded!
+✅  Dashboard loaded! (No auto-activation — user chooses)
 ```
 
 </div>
@@ -197,6 +209,8 @@
 ---
 
 ## 📁 RUNTIME DIRECTORY
+
+### Elevated (Rooted / Shizuku with permission)
 
 ```
 📂 /data/user_de/0/com.android.shell/beta/
@@ -219,6 +233,20 @@
 │
 └── 📁 logs/                      ← Service logs
 ```
+
+### App-Private (Non-rooted, no Shizuku permission)
+
+```
+📂 /data/data/beta.manager/files/beta/
+│
+├── 📁 plugins/                   ← Limited plugin storage
+│   └── 📁 <module_id>/
+│       └── module.prop           ← Identity + metadata
+│
+└── 📁 logs/                      ← Service logs
+```
+
+> 💡 **v1.4.0 Change:** BetaService now automatically falls back to app-private directories when elevated `mkdir` fails. No crash on non-rooted devices.
 
 ### 📂 All 6 Scanned Directories
 
@@ -330,7 +358,7 @@ axeronPlugin=10004
      │
   ✅ YES ──► Load dashboard
      │
-  ❌ NO ──► 🤖 AUTO-DETECT
+  ❌ NO ──► Show activation options (NO auto-activate)
                │
         ┌──────┼──────┐
         ▼      ▼      ▼
@@ -339,11 +367,13 @@ axeronPlugin=10004
         │      │      │
         └──────┴──────┘
                ▼
-       ✅ BetaService RUNNING
-       📊 Loading 6-source scan...
+        ✅ BetaService RUNNING
+        📊 Loading 6-source scan...
 ```
 
 </div>
+
+> 🛡️ **v1.4.0 Change:** Removed auto-activation on first launch. User must explicitly choose activation method to avoid permission prompts or crashes before consent.
 
 ---
 
@@ -396,6 +426,16 @@ Plugin has webroot/index.html
 Run shell commands directly from the app with AIDL-backed execution.
 Command history (last 100), real-time output, elevated via detected root type.
 
+### Shell Executor Hierarchy (v1.4.0)
+
+```
+Shell.executeWithElevation(cmd)
+   │
+   ├── 1. Root available? → su -c cmd
+   ├── 2. Shizuku permission? → ShizukuShell.execute(cmd)
+   └── 3. Nothing? → Shell.Result.Error("No elevated access")
+```
+
 ---
 
 ## 📦 TECH STACK
@@ -403,7 +443,7 @@ Command history (last 100), real-time output, elevated via detected root type.
 <div align="center">
 
 | Category | Technology | Version |
-|----------|-----------|---------| 
+|----------|-----------|---------|
 | 🗣️ **Language** | Kotlin | 2.1.0 |
 | 🎨 **UI Framework** | Jetpack Compose + Material 3 | BOM 2024.12 |
 | 🏗️ **Architecture** | MVVM (ViewModel + StateFlow) | — |
@@ -416,7 +456,7 @@ Command history (last 100), real-time output, elevated via detected root type.
 | ⚙️ **Build** | Gradle + AGP | 8.11.1 / 8.7.3 |
 | 📱 **Minimum SDK** | Android 8.0 (Oreo) | API 26 |
 | 🎯 **Target SDK** | Android 15 | API 35 |
-| 🔢 **Version Code** | 10004 | v1.3.0 |
+| 🔢 **Version Code** | 10004 | v1.4.0 |
 
 </div>
 
@@ -424,22 +464,22 @@ Command history (last 100), real-time output, elevated via detected root type.
 
 ## 🔧 BUILD INSTRUCTIONS
 
-### ✅ Tested & Working Build Commands
+### ✅ Clean Build (Recommended)
 
 ```bash
 # 1. Go to project folder
 cd "/home/willygailo/Documents/BETA MANAGER"
 
-# 2. Set Java 21 (required — Java 17+ supported, Java 21 recommended)
+# 2. Set Java 21 (required — Java 21 recommended)
 export JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64
 
 # 3. Set Android SDK path
 export ANDROID_HOME=/home/willygailo/Android/Sdk
 
-# 4. Build debug APK
-./gradlew assembleDebug 2>&1
+# 4. Clean build debug APK (removes all cached artifacts)
+./gradlew clean assembleDebug 2>&1
 
-# ✅ Expected output: BUILD SUCCESSFUL in ~39s
+# ✅ Expected output: BUILD SUCCESSFUL in ~6s
 # 📍 APK location:
 #    app/build/outputs/apk/debug/app-debug.apk
 ```
@@ -483,7 +523,7 @@ adb push cpu_boost_v2.0.0.zip /sdcard/
 
 ```
 ╔══════════════════════════════════════════════════════╗
-║              BETA MANAGER v1.3.0                     ║
+║              BETA MANAGER v1.4.0                     ║
 ║         Universal Module Manager for Android         ║
 ║         Android 8 (API 26) → Android 16 (API 36)    ║
 ║                                                      ║
@@ -498,7 +538,7 @@ adb push cpu_boost_v2.0.0.zip /sdcard/
 
 <div align="center">
   <p>
-    <strong>⚡ BETA MANAGER v1.3.0</strong> — <em>Root + Non-rooted Universal Module Manager</em>
+    <strong>⚡ BETA MANAGER v1.4.0</strong> — <em>Root + Non-rooted Universal Module Manager</em>
   </p>
   <p>
     Built with ❤️ by <strong>Willy Jr. C. Gailo</strong>

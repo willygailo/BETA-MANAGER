@@ -5,6 +5,8 @@ import androidx.lifecycle.viewModelScope
 import beta.manager.plugin.PluginInfo
 import beta.manager.plugin.PluginInstaller
 import beta.manager.plugin.PluginManager
+import beta.manager.utils.RootType
+import beta.manager.utils.Shell
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -20,7 +22,10 @@ data class PluginUiState(
     val isFixing: Boolean = false,
     val fixResult: String? = null,
     val selectedPlugin: PluginInfo? = null,
-    val flashMode: FlashMode = FlashMode.BETA
+    val flashMode: FlashMode = FlashMode.BETA,
+    val detectedRootType: RootType = RootType.NONE,
+    val installationProgress: Float = 0f,
+    val installationStep: String = ""
 )
 
 enum class FlashMode { BETA, MAGISK, KSU, APATCH, AXERON }
@@ -37,7 +42,25 @@ class PluginViewModel : ViewModel() {
     val uiState: StateFlow<PluginUiState> = _uiState.asStateFlow()
 
     init {
+        detectRootType()
         loadPlugins()
+    }
+
+    private fun detectRootType() {
+        viewModelScope.launch {
+            val type = Shell.refreshRootType()
+            val defaultMode = when (type) {
+                RootType.MAGISK -> FlashMode.MAGISK
+                RootType.KERNELSU -> FlashMode.KSU
+                RootType.APATCH -> FlashMode.APATCH
+                RootType.AXERON -> FlashMode.AXERON
+                else -> FlashMode.BETA
+            }
+            _uiState.value = _uiState.value.copy(
+                detectedRootType = type,
+                flashMode = defaultMode
+            )
+        }
     }
 
     fun loadPlugins() {
@@ -103,38 +126,55 @@ class PluginViewModel : ViewModel() {
 
     fun installZip(zipPath: String) {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isInstalling = true, installResult = null)
+            _uiState.value = _uiState.value.copy(
+                isInstalling = true,
+                installResult = null,
+                installationProgress = 0f,
+                installationStep = "Validating"
+            )
+            val progressCallback = object : PluginInstaller.ProgressCallback {
+                override fun onProgress(step: Int, total: Int, label: String) {
+                    _uiState.value = _uiState.value.copy(
+                        installationProgress = step.toFloat() / total,
+                        installationStep = label
+                    )
+                }
+            }
             try {
                 val mode = _uiState.value.flashMode
                 val result = when (mode) {
                     FlashMode.BETA -> {
-                        val success = pluginInstaller.install(zipPath)
+                        val success = pluginInstaller.install(zipPath, progressCallback)
                         Pair(success, if (success) "Plugin installed successfully" else "Installation failed")
                     }
                     FlashMode.MAGISK -> {
-                        val r = pluginInstaller.installToMagisk(zipPath)
+                        val r = pluginInstaller.installToMagisk(zipPath, progressCallback)
                         Pair(r.success, r.message)
                     }
                     FlashMode.KSU -> {
-                        val r = pluginInstaller.installToKSU(zipPath)
+                        val r = pluginInstaller.installToKSU(zipPath, progressCallback)
                         Pair(r.success, r.message)
                     }
                     FlashMode.APATCH -> {
-                        val r = pluginInstaller.installToAPatch(zipPath)
+                        val r = pluginInstaller.installToAPatch(zipPath, progressCallback)
                         Pair(r.success, r.message)
                     }
                     FlashMode.AXERON -> {
-                        val r = pluginInstaller.installToAxeron(zipPath)
+                        val r = pluginInstaller.installToAxeron(zipPath, progressCallback)
                         Pair(r.success, r.message)
                     }
                 }
                 _uiState.value = _uiState.value.copy(
                     isInstalling = false,
+                    installationProgress = 1f,
+                    installationStep = "Complete",
                     installResult = "${if (result.first) "✓" else "✗"} ${result.second}"
                 )
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isInstalling = false,
+                    installationProgress = 0f,
+                    installationStep = "",
                     installResult = "✗ Error: ${e.message}"
                 )
             }

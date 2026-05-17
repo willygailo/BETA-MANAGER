@@ -11,6 +11,7 @@ import beta.manager.IBetaService
 import beta.manager.plugin.PluginInstaller
 import beta.manager.plugin.PluginManager
 import beta.manager.utils.Shell
+import beta.manager.utils.ShizukuShell
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -37,26 +38,31 @@ class BetaService : Service() {
     }
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val pluginManager = PluginManager(PLUGINS_DIR)
-    private val pluginInstaller = PluginInstaller(PLUGINS_DIR, BASE_DIR)
+    private val hasElevatedPrivileges: Boolean
+        get() = Shell.isRootAvailableSync() || ShizukuShell.hasPermissionSync()
+    private val effectiveBaseDir: String by lazy {
+        if (hasElevatedPrivileges) BASE_DIR
+        else filesDir.absolutePath + "/beta/"
+    }
+    private val effectivePluginsDir: String by lazy { "$effectiveBaseDir/plugins/" }
+    private val effectiveBinDir: String by lazy { "$effectiveBaseDir/bin/" }
+    private val effectiveLogsDir: String by lazy { "$effectiveBaseDir/logs/" }
+    private val pluginManager by lazy { PluginManager(effectivePluginsDir) }
+    private val pluginInstaller by lazy { PluginInstaller(effectivePluginsDir, effectiveBaseDir) }
 
     private val binder = object : IBetaService.Stub() {
         override fun getVersion(): Int = SERVER_VERSION
 
         override fun executeCommand(command: String): String {
-            var result = ""
-            val job = serviceScope.launch {
-                when (val res = Shell.executeWithElevation(command)) {
-                    is Shell.Result.Success -> result = res.output
-                    is Shell.Result.Error -> result = "ERROR: ${res.message}"
+            return try {
+                val result = Shell.executeSyncWithElevation(command)
+                when (result) {
+                    is Shell.Result.Success -> result.output
+                    is Shell.Result.Error -> "ERROR: ${result.message}"
                 }
-            }
-            try {
-                kotlinx.coroutines.runBlocking { job.join() }
             } catch (e: Exception) {
-                result = "ERROR: ${e.message}"
+                "ERROR: ${e.message}"
             }
-            return result
         }
 
         override fun getPluginStatus(pluginId: String): String {
@@ -64,14 +70,11 @@ class BetaService : Service() {
         }
 
         override fun installPlugin(zipPath: String): Boolean {
-            var success = false
-            val job = serviceScope.launch {
-                success = pluginInstaller.install(zipPath)
+            return try {
+                pluginInstaller.installSync(zipPath)
+            } catch (_: Exception) {
+                false
             }
-            try {
-                kotlinx.coroutines.runBlocking { job.join() }
-            } catch (_: Exception) {}
-            return success
         }
 
         override fun removePlugin(pluginId: String): Boolean {
@@ -87,14 +90,11 @@ class BetaService : Service() {
         }
 
         override fun runPluginAction(pluginId: String): Boolean {
-            var success = false
-            val job = serviceScope.launch {
-                success = pluginManager.runAction(pluginId)
+            return try {
+                pluginManager.runActionSync(pluginId)
+            } catch (_: Exception) {
+                false
             }
-            try {
-                kotlinx.coroutines.runBlocking { job.join() }
-            } catch (_: Exception) {}
-            return success
         }
 
         override fun listPlugins(): Array<String> {
@@ -103,7 +103,7 @@ class BetaService : Service() {
 
         override fun isRunning(): Boolean = true
 
-        override fun getServerPath(): String = BASE_DIR
+        override fun getServerPath(): String = effectiveBaseDir
 
         override fun getApiLevel(): Int = Build.VERSION.SDK_INT
 
@@ -113,100 +113,77 @@ class BetaService : Service() {
         }
 
         override fun fixUpdateAll(): String {
-            val sb = StringBuilder()
-            val job = serviceScope.launch {
-                try {
-                    val plugins = pluginManager.scanPlugins()
-                    sb.appendLine("Found ${plugins.size} plugins")
+            return try {
+                val sb = StringBuilder()
+                val plugins = pluginManager.scanPluginsSync()
+                sb.appendLine("Found ${plugins.size} plugins")
 
-                    var fixed = 0
-                    var updated = 0
+                var fixed = 0
+                var updated = 0
 
-                    for (plugin in plugins) {
-                        if (pluginInstaller.fixPlugin(plugin.id)) {
-                            fixed++
-                            sb.appendLine("Fixed: ${plugin.name}")
-                        }
+                for (plugin in plugins) {
+                    if (pluginInstaller.fixPluginSync(plugin.id)) {
+                        fixed++
+                        sb.appendLine("Fixed: ${plugin.name}")
                     }
-
-                    val updates = pluginInstaller.checkForUpdates(plugins)
-                    for (update in updates) {
-                        if (update.needsUpdate) {
-                            sb.appendLine("Update available: ${update.name} (${update.currentVersionCode} -> ${update.newVersionCode})")
-                            updated++
-                        }
-                    }
-
-                    sb.appendLine("Fixed $fixed plugins, $updated updates available")
-                } catch (e: Exception) {
-                    sb.appendLine("Error: ${e.message}")
                 }
-            }
-            try {
-                kotlinx.coroutines.runBlocking { job.join() }
+
+                val updates = pluginInstaller.checkForUpdatesSync(plugins)
+                for (update in updates) {
+                    if (update.needsUpdate) {
+                        sb.appendLine("Update available: ${update.name} (${update.currentVersionCode} -> ${update.newVersionCode})")
+                        updated++
+                    }
+                }
+
+                sb.appendLine("Fixed $fixed plugins, $updated updates available")
+                sb.toString().trim()
             } catch (e: Exception) {
-                sb.appendLine("Error: ${e.message}")
+                "Error: ${e.message}"
             }
-            return sb.toString().trim()
         }
 
         override fun flashModule(zipPath: String): String {
-            val sb = StringBuilder()
-            val job = serviceScope.launch {
-                try {
-                    val file = File(zipPath)
-                    if (!file.exists()) {
-                        sb.appendLine("ERROR: ZIP not found: $zipPath")
-                        return@launch
-                    }
-
-                    val result = pluginInstaller.installToMagisk(zipPath)
+            return try {
+                val sb = StringBuilder()
+                val file = File(zipPath)
+                if (!file.exists()) {
+                    "ERROR: ZIP not found: $zipPath"
+                } else {
+                    val result = pluginInstaller.installToMagiskSync(zipPath)
                     if (result.success) {
                         sb.appendLine("SUCCESS: ${result.message}")
                         sb.appendLine("Module ID: ${result.pluginId}")
                         sb.appendLine("Reboot to apply module")
                     } else {
-                        val ksuResult = pluginInstaller.installToKSU(zipPath)
+                        val ksuResult = pluginInstaller.installToKSUSync(zipPath)
                         if (ksuResult.success) {
                             sb.appendLine("SUCCESS (KSU): ${ksuResult.message}")
                         } else {
                             sb.appendLine("FAILED: ${result.message}")
                         }
                     }
-                } catch (e: Exception) {
-                    sb.appendLine("ERROR: ${e.message}")
+                    sb.toString().trim()
                 }
-            }
-            try {
-                kotlinx.coroutines.runBlocking { job.join() }
             } catch (e: Exception) {
-                sb.appendLine("ERROR: ${e.message}")
+                "ERROR: ${e.message}"
             }
-            return sb.toString().trim()
         }
 
         override fun getRootType(): String {
-            var result = "unknown"
-            val job = serviceScope.launch {
-                result = Shell.detectRootType().name
+            return try {
+                Shell.detectRootTypeSync().name
+            } catch (_: Exception) {
+                "unknown"
             }
-            try {
-                kotlinx.coroutines.runBlocking { job.join() }
-            } catch (_: Exception) {}
-            return result
         }
 
         override fun getDebugInfo(): String {
-            var result = ""
-            val job = serviceScope.launch {
-                result = Shell.getDebugInfo()
-            }
-            try {
-                kotlinx.coroutines.runBlocking { job.join() }
+            return try {
+                Shell.getDebugInfoSync()
             } catch (e: Exception) {
-                result = "Error: ${e.message}"
+                "Error: ${e.message}"
             }
-            return result
         }
 
         override fun getPluginCount(): Int {
@@ -214,37 +191,25 @@ class BetaService : Service() {
         }
 
         override fun getEnabledCount(): Int {
-            return pluginManager.scanPlugins().count { it.isEnabled }
+            return pluginManager.scanPluginsSync().count { it.isEnabled }
         }
 
-        override fun getModulePath(): String = PLUGINS_DIR
+        override fun getModulePath(): String = effectivePluginsDir
 
         override fun getMagiskVersion(): String {
-            var result = "N/A"
-            val job = serviceScope.launch { result = Shell.getMagiskVersion() }
-            try { kotlinx.coroutines.runBlocking { job.join() } } catch (_: Exception) {}
-            return result
+            return try { Shell.getMagiskVersionSync() } catch (_: Exception) { "N/A" }
         }
 
         override fun getKernelSUVersion(): String {
-            var result = "N/A"
-            val job = serviceScope.launch { result = Shell.getKernelSUVersion() }
-            try { kotlinx.coroutines.runBlocking { job.join() } } catch (_: Exception) {}
-            return result
+            return try { Shell.getKernelSUVersionSync() } catch (_: Exception) { "N/A" }
         }
 
         override fun getAPatchVersion(): String {
-            var result = "N/A"
-            val job = serviceScope.launch { result = Shell.getAPatchVersion() }
-            try { kotlinx.coroutines.runBlocking { job.join() } } catch (_: Exception) {}
-            return result
+            return try { Shell.getAPatchVersionSync() } catch (_: Exception) { "N/A" }
         }
 
         override fun getAxeronVersion(): String {
-            var result = "N/A"
-            val job = serviceScope.launch { result = Shell.getAxeronVersion() }
-            try { kotlinx.coroutines.runBlocking { job.join() } } catch (_: Exception) {}
-            return result
+            return try { Shell.getAxeronVersionSync() } catch (_: Exception) { "N/A" }
         }
     }
 
@@ -261,9 +226,19 @@ class BetaService : Service() {
     }
 
     private suspend fun initialize() {
-        Shell.executeWithElevation(
-            "mkdir -p ${Shell.quote(PLUGINS_DIR)} ${Shell.quote(BIN_DIR)} ${Shell.quote(LOGS_DIR)}"
-        )
+        if (hasElevatedPrivileges) {
+            val result = Shell.executeWithElevation(
+                "mkdir -p ${Shell.quote(effectivePluginsDir)} ${Shell.quote(effectiveBinDir)} ${Shell.quote(effectiveLogsDir)}"
+            )
+            if (result is Shell.Result.Error) {
+                android.util.Log.e(TAG, "Failed to create elevated directories: ${result.message}")
+            }
+        } else {
+            File(effectivePluginsDir).mkdirs()
+            File(effectiveBinDir).mkdirs()
+            File(effectiveLogsDir).mkdirs()
+            android.util.Log.i(TAG, "Using app-private directory: $effectiveBaseDir")
+        }
         pluginManager.scanPlugins()
     }
 
